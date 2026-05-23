@@ -1,0 +1,92 @@
+import streamlit as st
+from utils.shared.sidebar import setup_page
+from utils.shared.styles import slim_header, disclaimer, confidentiality_notice, section, risk_badge
+from utils.shared.document_input import document_input_ui
+from utils.shared.export_utils import download_json
+
+api_key = setup_page()
+slim_header("🏢", "Due Diligence Review", "Identify red flags and key risks across transaction documents")
+disclaimer()
+confidentiality_notice()
+
+section("📎 Document Input")
+text = document_input_ui("dd", paste_placeholder="Paste due diligence document, SPA, or disclosure letter here…")
+
+st.markdown("<br>", unsafe_allow_html=True)
+c1, c2, c3 = st.columns(3)
+matter_type = c1.selectbox("Matter Type", [
+    "M&A / Acquisition", "Joint venture", "Investment / Fundraising",
+    "Real estate transaction", "Banking / Finance", "Commercial agreement", "Other",
+])
+client_perspective = c2.selectbox("Client Perspective", [
+    "Buyer / Investor", "Seller / Target", "Lender", "Borrower", "Neutral review",
+])
+key_concerns = c3.text_input("Key Concerns", placeholder="e.g. IP ownership, regulatory exposure, pending litigation")
+
+submit = st.button("🏢 Run Due Diligence Review", type="primary", disabled=not api_key)
+
+if submit:
+    if not text:
+        st.warning("⚠️ Upload a document or paste text first.")
+    else:
+        from utils.due_diligence import DueDiligenceReview
+        with st.spinner("Reviewing with Claude Opus 4.7…"):
+            try:
+                result = DueDiligenceReview(api_key).review(text, matter_type, client_perspective, key_concerns)
+                st.session_state.dd_result = result
+                st.success("✅ Review complete!")
+            except Exception as exc:
+                st.error(f"Review failed: {exc}")
+
+if st.session_state.get("dd_result"):
+    result = st.session_state.dd_result
+    red_flags = result.get("red_flags", [])
+    mat = result.get("matters_for_attention", [])
+
+    st.divider()
+    m1, m2, m3 = st.columns(3)
+    m1.markdown(f'<div class="metric-card"><div class="val" style="color:#dc2626">{len(red_flags)}</div><div class="lbl">Red Flags</div></div>', unsafe_allow_html=True)
+    m2.markdown(f'<div class="metric-card"><div class="val" style="color:#d97706">{len(mat)}</div><div class="lbl">Matters for Attention</div></div>', unsafe_allow_html=True)
+    m3.markdown(f'<div class="metric-card"><div class="val">{result.get("overall_risk","—")}</div><div class="lbl">Overall Risk</div></div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f"**Executive Summary:** {result.get('executive_summary','')}")
+
+    if red_flags:
+        st.markdown("<br>", unsafe_allow_html=True)
+        section(f"🚨 Red Flags ({len(red_flags)})")
+        hdr = st.columns([1.5, 3, 2, 1.5, 1])
+        for col, lbl in zip(hdr, ["Category", "Issue", "Implication", "Recommendation", "Severity"]):
+            col.markdown(f"**{lbl}**")
+        st.divider()
+        for rf in red_flags:
+            row = st.columns([1.5, 3, 2, 1.5, 1])
+            row[0].markdown(rf.get("category", ""))
+            row[1].markdown(rf.get("issue", ""))
+            row[2].markdown(rf.get("implication", ""))
+            row[3].markdown(rf.get("recommendation", ""))
+            row[4].markdown(risk_badge(rf.get("severity", "medium")), unsafe_allow_html=True)
+            st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+
+    if mat:
+        st.markdown("<br>", unsafe_allow_html=True)
+        section(f"⚠️ Matters for Attention ({len(mat)})")
+        for m in mat:
+            st.warning(m)
+
+    for key, label in [("key_strengths", "✅ Key Strengths"), ("recommendations", "💡 Recommendations")]:
+        items = result.get(key, [])
+        if items:
+            st.markdown("<br>", unsafe_allow_html=True)
+            section(label)
+            for item in items:
+                st.markdown(f"- {item}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, _, c3 = st.columns(3)
+    with c1:
+        download_json("📥 Download DD Report (.json)", result, "due_diligence_report.json", key="dd_dl")
+    with c3:
+        if st.button("🔄 Reset", use_container_width=True, key="dd_reset"):
+            st.session_state.pop("dd_result", None)
+            st.rerun()
