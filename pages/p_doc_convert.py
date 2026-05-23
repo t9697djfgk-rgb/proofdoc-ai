@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import json
 from pathlib import Path
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, confidentiality_notice, section
@@ -18,129 +17,63 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 
-# ── helpers ──────────────────────────────────────────────────────
-def _render_doc_preview(extracted: dict) -> str:
-    blocks = extracted.get("content_blocks", [])
-    if not blocks:
-        return "<p style='color:#64748b;font-style:italic'>No content blocks found.</p>"
-    html = ""
-    for b in blocks:
-        text = b.get("text", "").replace("<", "&lt;").replace(">", "&gt;")
-        btype = b.get("type", "paragraph")
-        fmt = b.get("formatting", "normal")
-        align = b.get("alignment", "left")
-        lvl = min(b.get("level", 2), 6)
-        style = f"text-align:{align};"
-        if btype == "heading":
-            html += f"<h{lvl} style='{style}color:#1e3a5f'>{text}</h{lvl}>"
-        elif btype == "stamp":
-            html += f"<div class='stamp'>{text}</div>"
-        elif btype == "signature_block":
-            html += f"<div class='sig-block'>✍️ {text}</div>"
-        elif btype in ("header", "footer"):
-            html += f"<div style='{style}font-size:0.8em;color:#94a3b8'>{text}</div>"
-        else:
-            fw = "bold" if fmt == "bold" else "normal"
-            fi = "italic" if fmt == "italic" else "normal"
-            html += f"<p style='{style}font-weight:{fw};font-style:{fi};margin:0.3rem 0'>{text}</p>"
-    return html
-
-
-# ── Tab 1: Reconstruct ───────────────────────────────────────────
+# ── Tab 1: PDF / Image → Word ─────────────────────────────────────
 with tab1:
-    st.markdown("Use Claude Opus 4.7 vision to reconstruct scanned PDFs and images into editable Word documents.")
-    left, right = st.columns(2, gap="large")
+    st.markdown("Upload a scanned PDF or image — Claude Opus 4.7 reads every page and produces an editable Word document.")
 
-    with left:
-        section("Upload Document")
-        doc_type = st.selectbox("Document Type", [
-            "legal", "contract", "court_filing", "deed", "invoice", "report", "letter", "general",
-        ])
-        uploaded_file = st.file_uploader(
-            "Drop your scanned PDF or image",
-            type=["pdf", "png", "jpg", "jpeg", "tiff", "bmp", "webp"],
-        )
-        if uploaded_file:
-            st.info(f"📄 **{uploaded_file.name}** · {uploaded_file.size / 1024:.1f} KB")
-        show_raw = st.checkbox("Show raw JSON", value=False)
-        process_btn = st.button("🚀 Reconstruct Document", type="primary",
-                                disabled=not (uploaded_file and api_key), use_container_width=True)
+    doc_type = st.selectbox("Document type", [
+        "legal", "contract", "court_filing", "deed", "invoice", "report", "letter", "general",
+    ], key="conv_doctype")
+    uploaded_file = st.file_uploader(
+        "Drop your scanned PDF or image",
+        type=["pdf", "png", "jpg", "jpeg", "tiff", "bmp", "webp"],
+        key="conv_upload",
+    )
+    if uploaded_file:
+        st.caption(f"📄 {uploaded_file.name} · {uploaded_file.size / 1024:.1f} KB")
 
-    with right:
-        section("Document Preview")
-        preview_ph = st.empty()
-        preview_ph.markdown(
-            '<div class="doc-preview" style="color:#94a3b8;font-style:italic;text-align:center;padding-top:4rem">'
-            '📄 Upload and click Reconstruct to see a preview.</div>',
-            unsafe_allow_html=True,
-        )
-
-    if process_btn and uploaded_file and api_key:
+    if st.button("🚀 Convert to Word", type="primary",
+                 disabled=not (uploaded_file and api_key), use_container_width=True):
         from utils.claude_processor import ClaudeDocumentProcessor
         from utils.document_builder import DocumentBuilder
         from utils.confidentiality import ConfidentialityManager
-        conf_mgr = ConfidentialityManager()
+        cm = ConfidentialityManager()
         try:
-            temp_input = conf_mgr.secure_path(uploaded_file.name)
-            with open(temp_input, "wb") as f:
+            tmp_in = cm.secure_path(uploaded_file.name)
+            with open(tmp_in, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            conf_mgr.log_action("UPLOAD", uploaded_file.name)
-            progress = st.progress(0, text="Initialising Claude Opus 4.7…")
-            processor = ClaudeDocumentProcessor(api_key)
-            progress.progress(20, text="Analysing document…")
-            extracted = processor.process_document(temp_input, doc_type)
-            conf_mgr.log_action("PROCESS_COMPLETE", uploaded_file.name, extracted.get("avg_confidence"))
-            progress.progress(75, text="Building Word document…")
-            builder = DocumentBuilder()
-            output_name = Path(uploaded_file.name).stem + "_reconstructed.docx"
-            output_path = conf_mgr.secure_path(output_name)
-            builder.build_word_document(extracted, uploaded_file.name, output_path)
-            conf_mgr.log_action("BUILD_WORD", output_name)
-            progress.progress(100, text="Done!")
-            st.session_state.conv_extracted = extracted
-            st.session_state.conv_output_path = output_path
-            st.session_state.conv_output_name = output_name
-            st.session_state.last_audit = conf_mgr.get_audit_report()
-            st.success("✅ Reconstruction complete!")
-        except Exception as exc:
-            st.error(f"Processing failed: {exc}")
 
-    if st.session_state.get("conv_extracted"):
-        extracted = st.session_state.conv_extracted
-        preview_ph.markdown(
-            f'<div class="doc-preview">{_render_doc_preview(extracted)}</div>',
-            unsafe_allow_html=True,
-        )
-        st.divider()
-        conf = extracted.get("avg_confidence", 0)
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="metric-card"><div class="val">{conf:.0f}%</div><div class="lbl">Confidence</div></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="metric-card"><div class="val">{extracted.get("total_pages", 0)}</div><div class="lbl">Pages</div></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="metric-card"><div class="val">{len(extracted.get("tables", []))}</div><div class="lbl">Tables</div></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="metric-card"><div class="val">{len(extracted.get("signatures", []))}</div><div class="lbl">Signatures</div></div>', unsafe_allow_html=True)
-        if show_raw:
-            with st.expander("🔍 Full JSON"):
-                st.json({k: v for k, v in extracted.items() if k != "page_results"})
-        st.divider()
-        dl1, dl2 = st.columns(2)
-        output_path = st.session_state.get("conv_output_path")
-        if output_path and os.path.exists(output_path):
+            bar = st.progress(0, text="Reading document…")
+            extracted = ClaudeDocumentProcessor(api_key).process_document(tmp_in, doc_type)
+            bar.progress(80, text="Building Word file…")
+
+            output_name = Path(uploaded_file.name).stem + "_reconstructed.docx"
+            output_path = cm.secure_path(output_name)
+            DocumentBuilder().build_word_document(extracted, uploaded_file.name, output_path)
+            bar.progress(100, text="Done!")
+
             with open(output_path, "rb") as f:
-                dl1.download_button("📥 Download Word (.docx)", data=f.read(),
-                    file_name=st.session_state.conv_output_name,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True)
-            try:
-                from utils.word_to_pdf import convert_word_to_pdf
-                from utils.confidentiality import ConfidentialityManager as CM
-                pdf_name = Path(st.session_state.conv_output_name).stem + ".pdf"
-                pdf_out = CM().secure_path(pdf_name)
-                convert_word_to_pdf(output_path, pdf_out)
-                with open(pdf_out, "rb") as pf:
-                    dl2.download_button("📥 Download as PDF", data=pf.read(),
-                        file_name=pdf_name, mime="application/pdf", use_container_width=True)
-            except Exception:
-                pass
+                docx_bytes = f.read()
+            st.session_state.conv_docx_bytes = docx_bytes
+            st.session_state.conv_output_name = output_name
+            st.session_state.last_audit = cm.get_audit_report()
+        except Exception as exc:
+            st.error(f"Conversion failed: {exc}")
+
+    if st.session_state.get("conv_docx_bytes"):
+        st.success("✅ Ready to download!")
+        st.download_button(
+            "📥 Download Word (.docx)",
+            data=st.session_state.conv_docx_bytes,
+            file_name=st.session_state.conv_output_name,
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+            key="conv_dl",
+        )
+        if st.button("🔄 Convert another file", key="conv_reset"):
+            st.session_state.pop("conv_docx_bytes", None)
+            st.session_state.pop("conv_output_name", None)
+            st.rerun()
 
 
 # ── Tab 2: Word → PDF ─────────────────────────────────────────────

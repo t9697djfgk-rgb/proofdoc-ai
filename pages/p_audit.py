@@ -2,7 +2,7 @@ import streamlit as st
 import json
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, section
-from utils.auth import require_lawyer, can_see_internals
+from utils.auth import require_lawyer
 import utils.database as db
 
 setup_page()

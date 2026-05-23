@@ -150,12 +150,16 @@ with tab3:
         search_q = sc1.text_input("Search clauses", placeholder="e.g. force majeure, termination", key="cl_sq")
         cat_filter = sc2.selectbox("Category", ["All"] + CATEGORIES, key="cl_cf")
         jur_filter = sc3.selectbox("Jurisdiction", ["All"] + JURISDICTIONS, key="cl_jf")
-        clauses = (
-            search(search_q, None if cat_filter == "All" else cat_filter,
-                   None if jur_filter == "All" else jur_filter)
-            if search_q else get_all(None if cat_filter == "All" else cat_filter,
-                                     None if jur_filter == "All" else jur_filter)
-        )
+        cat_arg = None if cat_filter == "All" else cat_filter
+        jur_arg = None if jur_filter == "All" else jur_filter
+        if search_q:
+            clauses = search(search_q, cat_arg or "", jur_arg or "")
+        else:
+            clauses = [
+                c for c in get_all()
+                if (not cat_arg or c.get("category") == cat_arg)
+                and (not jur_arg or c.get("jurisdiction") == jur_arg)
+            ]
         st.caption(f"{len(clauses)} clause(s) found")
         for cl in clauses:
             with st.expander(f"**{cl.get('name','')}** · {cl.get('category','')} · {cl.get('jurisdiction','')}"):

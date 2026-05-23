@@ -339,10 +339,15 @@ def list_time_entries(matter_id: str | None = None) -> list[dict]:
     org = _org()
     if not org:
         return []
-    q = get_db().table("time_entries").select("*").eq("organization_id", org)
+    q = get_db().table("time_entries").select("*, profiles!lawyer_id(full_name)").eq("organization_id", org)
     if matter_id:
         q = q.eq("matter_id", matter_id)
-    return (q.order("entry_date", desc=True).execute()).data or []
+    rows = (q.order("entry_date", desc=True).execute()).data or []
+    # Normalise: expose entry_date as "date" and profile name as "lawyer" for templates
+    for r in rows:
+        r.setdefault("date", r.get("entry_date", ""))
+        r.setdefault("lawyer", (r.get("profiles") or {}).get("full_name", ""))
+    return rows
 
 
 def add_time_entry(matter_id: str | None, hours: float, description: str,

@@ -277,8 +277,7 @@ with tab_translation:
     with t_tab2:
         st.markdown("Compare an original legal document with its translation to detect meaning discrepancies.")
         from utils.shared.document_input import two_document_input_ui
-        bl_orig, bl_trans = two_document_input_ui("bl",
-            label1="Original Document", label2="Translated Document")
+        bl_orig, bl_trans = two_document_input_ui("bl")
         c1, c2 = st.columns(2)
         bl_src = c1.text_input("Source Language", placeholder="e.g. French", key="bl_src")
         bl_tgt = c2.text_input("Target Language", placeholder="e.g. English", key="bl_tgt")

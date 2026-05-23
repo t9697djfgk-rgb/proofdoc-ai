@@ -19,24 +19,22 @@ with tab_time:
     matter_options = {"(No matter / General)": ""} | {f"{m['ref']}: {m['title'][:40]}": m["id"] for m in matters}
 
     with st.form("billing_time", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        bt_matter   = c1.selectbox("Matter", list(matter_options.keys()), key="bt_m")
-        bt_lawyer   = c2.text_input("Lawyer", placeholder="Your name", key="bt_law")
-        bt_date     = c3.text_input("Date (YYYY-MM-DD)", value=str(__import__("datetime").date.today()), key="bt_d")
-        c4, c5, c6 = st.columns(3)
-        bt_hours    = c4.number_input("Hours", min_value=0.25, step=0.25, value=1.0, key="bt_h")
-        bt_rate     = c5.number_input("Rate (£/hr)", min_value=0.0, step=50.0, value=250.0, key="bt_r")
-        bt_desc     = c6.text_input("Description *", placeholder="e.g. Drafting NDA, client call", key="bt_desc")
+        c1, c2 = st.columns(2)
+        bt_matter = c1.selectbox("Matter", list(matter_options.keys()), key="bt_m")
+        bt_date   = c2.text_input("Date (YYYY-MM-DD)", value=str(__import__("datetime").date.today()), key="bt_d")
+        c3, c4, c5 = st.columns(3)
+        bt_hours  = c3.number_input("Hours", min_value=0.25, step=0.25, value=1.0, key="bt_h")
+        bt_rate   = c4.number_input("Rate (£/hr)", min_value=0.0, step=50.0, value=250.0, key="bt_r")
+        bt_desc   = c5.text_input("Description *", placeholder="e.g. Drafting NDA, client call", key="bt_desc")
         if st.form_submit_button("＋ Log Time", type="primary"):
             if not bt_desc.strip():
                 st.warning("⚠️ Description is required.")
             else:
                 db.add_time_entry(
-                    matter_id=matter_options.get(bt_matter, ""),
+                    matter_id=matter_options.get(bt_matter) or None,
                     hours=bt_hours,
                     description=bt_desc.strip(),
                     rate=bt_rate,
-                    lawyer=bt_lawyer.strip(),
                     entry_date=bt_date.strip(),
                 )
                 st.success(f"✅ {bt_hours}h logged.")
