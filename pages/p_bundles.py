@@ -2,7 +2,9 @@ import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, group_header, placeholder_feature
 
+from utils.auth import require_lawyer
 setup_page()
+require_lawyer()
 slim_header("📦", "Trial Bundles", "Build, paginate, and index court bundles, exhibit lists, and witness lists")
 
 group_header("Bundle Preparation")

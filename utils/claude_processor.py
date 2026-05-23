@@ -22,7 +22,7 @@ class ClaudeDocumentProcessor:
         if image.mode in ("RGBA", "LA", "P"):
             image = image.convert("RGB")
         buffer = io.BytesIO()
-        image.save(buffer, format="JPEG", quality=95)
+        image.save(buffer, format="JPEG", quality=85)  # 85 still sharp, ~25% smaller
         return base64.standard_b64encode(buffer.getvalue()).decode()
 
     def _extract_images(self, file_path: str) -> list:
@@ -32,7 +32,7 @@ class ClaudeDocumentProcessor:
             doc = fitz.open(file_path)
             images = []
             for page in doc:
-                mat = fitz.Matrix(200 / 72, 200 / 72)
+                mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI — faster, still sharp
                 pix = page.get_pixmap(matrix=mat)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 images.append(img)
@@ -151,10 +151,15 @@ Extract ALL content precisely and return ONLY this JSON (no other text):
 
     def process_document(self, file_path: str, doc_type: str = "legal") -> dict:
         images = self._extract_images(file_path)
-        results = [
-            self._analyze_page(img, i + 1, len(images), doc_type)
-            for i, img in enumerate(images)
-        ]
+        results = [None] * len(images)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(max_workers=min(5, len(images))) as pool:
+            futures = {
+                pool.submit(self._analyze_page, img, i + 1, len(images), doc_type): i
+                for i, img in enumerate(images)
+            }
+            for future in as_completed(futures):
+                results[futures[future]] = future.result()
         return self._consolidate(results)
 
     def _consolidate(self, page_results: list) -> dict:

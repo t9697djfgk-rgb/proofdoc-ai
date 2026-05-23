@@ -1,18 +1,20 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, placeholder_feature, group_header
+from utils.shared.styles import slim_header, placeholder_feature, group_header, section
+from utils.auth import require_lawyer
 from utils import database as db
 
 setup_page()
-slim_header("📁", "Matters", "Manage clients, matters, leads, and engagement workflow")
+require_lawyer()
 
-tab_matters, tab_clients, tab_leads, tab_conflict, tab_engagement = st.tabs([
-    "📁 Matters", "👥 Clients", "🔮 Leads", "⚖️ Conflict Check", "📜 Engagement Letters",
+slim_header("📁", "Matters", "Manage clients, matters, and engagement workflow")
+
+tab_matters, tab_clients, tab_conflict, tab_engagement = st.tabs([
+    "📁 Matters", "👥 Clients", "⚖️ Conflict Check", "📜 Engagement Letters",
 ])
 
-# ── MATTERS ──────────────────────────────────────────────────────────────────
+# ── MATTERS ────────────────────────────────────────────────────────
 with tab_matters:
-    # New Matter dialog state
     if "show_new_matter" not in st.session_state:
         st.session_state.show_new_matter = False
     if "selected_matter_id" not in st.session_state:
@@ -23,23 +25,20 @@ with tab_matters:
     if col_btn.button("＋ New Matter", type="primary", use_container_width=True):
         st.session_state.show_new_matter = True
 
-    # New Matter form
     if st.session_state.show_new_matter:
         with st.form("new_matter_form", clear_on_submit=True):
             group_header("Create New Matter")
             f1, f2 = st.columns(2)
             m_title  = f1.text_input("Matter Title *", placeholder="e.g. Smith v Jones — Breach of Contract")
-            clients  = db.list_clients(status="Active")
-            client_options = {"(No client)": ""} | {c["name"]: c["id"] for c in clients}
-            m_client = f2.selectbox("Client", list(client_options.keys()))
-            f3, f4, f5 = st.columns(3)
+            clients  = db.list_clients()
+            client_opts = {"(No client)": ""} | {c["name"]: c["id"] for c in clients}
+            m_client = f2.selectbox("Client", list(client_opts.keys()))
+            f3, f4 = st.columns(2)
             m_type   = f3.selectbox("Matter Type", [
                 "Commercial", "Employment", "Property", "Family", "Criminal",
                 "Immigration", "Intellectual Property", "Corporate", "Litigation", "Other",
             ])
-            m_juris  = f4.selectbox("Jurisdiction", ["UK", "US", "EU", "Rwanda", "International", "Other"])
-            m_lawyer = f5.text_input("Lead Lawyer", placeholder="e.g. Jane Smith")
-            m_dead   = f1.text_input("Deadline (YYYY-MM-DD)", placeholder="2026-12-31")
+            m_juris  = f4.selectbox("Jurisdiction", ["Rwanda", "UK", "US", "EU", "International", "Other"])
             m_desc   = st.text_area("Description", height=80)
             s1, s2, _ = st.columns(3)
             submitted = s1.form_submit_button("💾 Save Matter", type="primary", use_container_width=True)
@@ -50,132 +49,145 @@ with tab_matters:
                 if not m_title.strip():
                     st.error("Matter title is required.")
                 else:
+                    user = st.session_state.get("user", {})
+                    existing = db.list_matters()
+                    ref = f"MAT-{__import__('datetime').date.today().year}-{len(existing)+1:04d}"
                     matter = db.create_matter(
+                        ref=ref,
                         title=m_title.strip(),
-                        client_id=client_options.get(m_client, ""),
-                        type_=m_type,
+                        matter_type=m_type,
                         jurisdiction=m_juris,
-                        deadline=m_dead.strip(),
-                        lead_lawyer=m_lawyer.strip(),
                         description=m_desc.strip(),
                     )
+                    if matter and client_opts.get(m_client):
+                        client_profile = db.get_db().table("clients").select("profile_id").eq("id", client_opts[m_client]).maybe_single().execute()
+                        if client_profile.data and client_profile.data.get("profile_id"):
+                            db.add_matter_member(matter["id"], client_profile.data["profile_id"], "client")
                     st.session_state.show_new_matter = False
-                    st.session_state.selected_matter_id = matter["id"]
-                    st.success(f"✅ Matter {matter['ref']} created.")
+                    if matter:
+                        st.session_state.selected_matter_id = matter["id"]
                     st.rerun()
 
-    # Matter list
     matters = db.list_matters()
     if not matters:
         st.markdown(
             '<div class="empty-list" style="margin-top:1rem">'
             '📁 No matters yet.<br>'
             '<small>Click <strong>＋ New Matter</strong> to create your first matter.</small>'
-            '</div>',
-            unsafe_allow_html=True,
+            '</div>', unsafe_allow_html=True,
         )
     else:
-        # Status filter
         f_col1, f_col2, _ = st.columns([1, 1, 2])
-        status_filter  = f_col1.selectbox("Status", ["All", "Active", "Closed", "On Hold"], key="m_status")
-        search_filter  = f_col2.text_input("Search", placeholder="Title or ref…", key="m_search")
+        status_filter = f_col1.selectbox("Status", ["All", "Active", "Closed", "On Hold", "Archived"], key="m_status")
+        search_filter = f_col2.text_input("Search", placeholder="Title or ref…", key="m_search")
         visible = [
             m for m in matters
-            if (status_filter == "All" or m["status"] == status_filter)
-            and (not search_filter or search_filter.lower() in m["title"].lower() or search_filter.lower() in m["ref"].lower())
+            if (status_filter == "All" or m.get("status") == status_filter)
+            and (not search_filter or search_filter.lower() in m["title"].lower()
+                 or search_filter.lower() in m.get("ref", "").lower())
         ]
-
-        # Header row
         h = st.columns([1, 3, 1.5, 1, 1.5, 1])
-        for col, lbl in zip(h, ["Ref", "Title", "Type", "Status", "Deadline", "Action"]):
+        for col, lbl in zip(h, ["Ref", "Title", "Type", "Status", "Jurisdiction", "Action"]):
             col.markdown(f"**{lbl}**")
         st.divider()
-
+        STATUS_ICON = {"Active": "🟢", "Closed": "🔴", "On Hold": "🟡", "Archived": "⚫"}
         for m in visible:
             row = st.columns([1, 3, 1.5, 1, 1.5, 1])
-            row[0].text(m["ref"])
+            row[0].text(m.get("ref", ""))
             row[1].text(m["title"])
-            row[2].text(m["type"] or "—")
-            status_color = {"Active": "🟢", "Closed": "🔴", "On Hold": "🟡"}.get(m["status"], "⚪")
-            row[3].text(f"{status_color} {m['status']}")
-            row[4].text(m["deadline"] or "—")
+            row[2].text(m.get("matter_type") or "—")
+            s = m.get("status", "")
+            row[3].text(f"{STATUS_ICON.get(s,'⚪')} {s}")
+            row[4].text(m.get("jurisdiction") or "—")
             if row[5].button("Open", key=f"open_{m['id']}", use_container_width=True):
                 st.session_state.selected_matter_id = m["id"]
                 st.rerun()
-
         st.caption(f"{len(visible)} of {len(matters)} matters shown")
 
-    # Matter detail panel
-    if st.session_state.selected_matter_id:
+    # ── Matter Detail ──────────────────────────────────────────────
+    if st.session_state.get("selected_matter_id"):
         matter = db.get_matter(st.session_state.selected_matter_id)
         if matter:
             st.markdown("---")
-            st.markdown(f"### 📁 {matter['ref']} — {matter['title']}")
+            st.markdown(f"### 📁 {matter.get('ref','')} — {matter['title']}")
             d1, d2, d3, d4 = st.columns(4)
-            d1.metric("Type",        matter.get("type") or "—")
-            d2.metric("Status",      matter.get("status") or "—")
-            d3.metric("Jurisdiction",matter.get("jurisdiction") or "—")
-            d4.metric("Lead Lawyer", matter.get("lead_lawyer") or "—")
+            d1.metric("Type",         matter.get("matter_type") or "—")
+            d2.metric("Status",       matter.get("status") or "—")
+            d3.metric("Jurisdiction", matter.get("jurisdiction") or "—")
+            d4.metric("Priority",     matter.get("priority") or "—")
 
             m_tabs = st.tabs([
                 "Overview", "Tasks", "Notes", "Time", "Documents",
-                "AI Reviews", "Drafts", "Deadlines", "Timeline", "Evidence",
-                "Billing", "Audit History",
+                "Members", "Discussion", "AI Reviews", "Drafts",
+                "Deadlines", "Billing", "Audit",
             ])
 
             # Overview
             with m_tabs[0]:
-                group_header("Matter Details")
-                e1, e2 = st.columns(2)
-                new_status  = e1.selectbox("Status", ["Active", "Closed", "On Hold"],
-                                           index=["Active","Closed","On Hold"].index(matter.get("status","Active")),
-                                           key="edit_status")
-                new_deadline= e2.text_input("Deadline", value=matter.get("deadline") or "", key="edit_dead")
-                new_desc    = st.text_area("Description", value=matter.get("description") or "", key="edit_desc")
-                if st.button("💾 Save Changes", key="save_matter"):
-                    db.update_matter(matter["id"], status=new_status,
-                                     deadline=new_deadline, description=new_desc)
-                    st.success("✅ Matter updated.")
-                    st.rerun()
-                col_close, col_del, _ = st.columns(3)
-                if col_close.button("🗄️ Close Matter", key="close_m"):
-                    db.update_matter(matter["id"], status="Closed")
-                    st.session_state.selected_matter_id = None
-                    st.rerun()
+                with st.form("edit_matter_form"):
+                    e1, e2 = st.columns(2)
+                    status_opts = ["Active", "On Hold", "Closed", "Archived"]
+                    curr_status = matter.get("status", "Active")
+                    new_status  = e1.selectbox("Status", status_opts,
+                                               index=status_opts.index(curr_status) if curr_status in status_opts else 0)
+                    priority_opts = ["high", "medium", "low"]
+                    curr_pri = matter.get("priority", "medium")
+                    new_priority = e2.selectbox("Priority", priority_opts,
+                                                index=priority_opts.index(curr_pri) if curr_pri in priority_opts else 1)
+                    new_close = e1.text_input("Close Date (YYYY-MM-DD)", value=str(matter.get("close_date") or ""))
+                    new_court = e2.text_input("Court Reference", value=matter.get("court_reference") or "")
+                    new_opp   = e1.text_input("Opposing Party",  value=matter.get("opposing_party") or "")
+                    new_desc  = st.text_area("Description", value=matter.get("description") or "")
+                    if st.form_submit_button("💾 Save Changes", type="primary"):
+                        db.update_matter(matter["id"],
+                                         status=new_status, priority=new_priority,
+                                         description=new_desc,
+                                         court_reference=new_court.strip(),
+                                         opposing_party=new_opp.strip(),
+                                         close_date=new_close.strip() or None)
+                        st.success("✅ Matter updated.")
+                        st.rerun()
+                col_del, _ = st.columns([1, 3])
                 if col_del.button("🗑️ Delete Matter", key="del_m"):
                     db.delete_matter(matter["id"])
                     st.session_state.selected_matter_id = None
-                    st.success("Matter deleted.")
                     st.rerun()
 
             # Tasks
             with m_tabs[1]:
-                tasks = db.list_tasks(matter_id=matter["id"])
-                with st.form("new_task", clear_on_submit=True):
+                lawyers = db.list_lawyers()
+                lawyer_opts = {"Unassigned": None} | {l["full_name"]: l["id"] for l in lawyers}
+                with st.form("new_task_form", clear_on_submit=True):
                     t1, t2, t3 = st.columns(3)
                     t_title    = t1.text_input("Task *")
-                    t_priority = t2.selectbox("Priority", ["High", "Medium", "Low"])
+                    t_priority = t2.selectbox("Priority", ["high", "medium", "low"])
                     t_due      = t3.text_input("Due (YYYY-MM-DD)")
-                    t_assign   = st.text_input("Assigned to")
+                    t_assign   = st.selectbox("Assign to", list(lawyer_opts.keys()), key="task_assign")
                     if st.form_submit_button("＋ Add Task"):
                         if t_title.strip():
-                            db.create_task(matter["id"], t_title.strip(),
-                                           priority=t_priority, due_date=t_due.strip(),
-                                           assigned_to=t_assign.strip())
+                            db.create_task(
+                                matter_id=matter["id"], title=t_title.strip(),
+                                priority=t_priority,
+                                due_date=t_due.strip() or None,
+                                assigned_to=lawyer_opts[t_assign],
+                            )
                             st.rerun()
-
+                tasks = db.list_tasks(matter_id=matter["id"])
                 if not tasks:
                     st.markdown('<div class="empty-list">No tasks yet.</div>', unsafe_allow_html=True)
                 else:
+                    STATUS_MAP = {"pending": 0, "in_progress": 1, "completed": 2, "cancelled": 3}
+                    STATUS_OPTS = ["pending", "in_progress", "completed", "cancelled"]
                     for t in tasks:
-                        tc = st.columns([3, 1, 1, 1, 0.5])
+                        tc = st.columns([3, 1, 1, 1.5, 0.5])
                         tc[0].text(t["title"])
-                        tc[1].text(t["priority"])
-                        tc[2].text(t["due_date"] or "—")
-                        new_s = tc[3].selectbox("", ["Pending","In Progress","Done"],
-                                                index=["Pending","In Progress","Done"].index(t["status"]),
+                        tc[1].text((t.get("priority") or "").title())
+                        tc[2].text(str(t.get("due_date") or "—")[:10])
+                        curr = t.get("status", "pending")
+                        new_s = tc[3].selectbox("", STATUS_OPTS,
+                                                index=STATUS_MAP.get(curr, 0),
                                                 key=f"ts_{t['id']}", label_visibility="collapsed")
-                        if new_s != t["status"]:
+                        if new_s != curr:
                             db.update_task(t["id"], status=new_s)
                             st.rerun()
                         if tc[4].button("🗑️", key=f"del_t_{t['id']}"):
@@ -184,63 +196,122 @@ with tab_matters:
 
             # Notes
             with m_tabs[2]:
-                with st.form("new_note", clear_on_submit=True):
-                    n_body   = st.text_area("Note", height=80)
-                    n_author = st.text_input("Author", placeholder="Your name")
+                user = st.session_state.get("user", {})
+                with st.form("new_note_form", clear_on_submit=True):
+                    n_title = st.text_input("Title (optional)")
+                    n_body  = st.text_area("Note *", height=80)
                     if st.form_submit_button("＋ Add Note"):
                         if n_body.strip():
-                            db.add_note(matter["id"], n_body.strip(), n_author.strip())
+                            db.add_note(matter["id"], n_body.strip(), n_title.strip())
                             st.rerun()
                 for note in db.list_notes(matter["id"]):
+                    author = (note.get("profiles") or {}).get("full_name", "Anonymous")
                     st.markdown(
-                        f'<div class="activity-item">'
-                        f'<strong>{note["author"] or "Anonymous"}</strong> · {note["created_at"][:16]}<br>{note["body"]}'
-                        f'</div>',
-                        unsafe_allow_html=True,
+                        f'<div class="activity-item"><strong>{author}</strong> · '
+                        f'{str(note.get("created_at",""))[:16]}<br>'
+                        f'{"<b>" + note["title"] + "</b><br>" if note.get("title") else ""}'
+                        f'{note["body"]}</div>', unsafe_allow_html=True,
                     )
 
             # Time
             with m_tabs[3]:
-                with st.form("new_time", clear_on_submit=True):
+                with st.form("new_time_form", clear_on_submit=True):
                     ti1, ti2, ti3 = st.columns(3)
-                    ti_hours  = ti1.number_input("Hours", min_value=0.25, step=0.25, value=1.0)
-                    ti_rate   = ti2.number_input("Rate (£/hr)", min_value=0.0, step=50.0, value=0.0)
-                    ti_date   = ti3.text_input("Date (YYYY-MM-DD)")
-                    ti_desc   = st.text_input("Description")
-                    ti_lawyer = st.text_input("Lawyer")
+                    ti_hours = ti1.number_input("Hours", min_value=0.25, step=0.25, value=1.0)
+                    ti_rate  = ti2.number_input("Rate (£/hr)", min_value=0.0, step=50.0, value=250.0)
+                    ti_date  = ti3.text_input("Date (YYYY-MM-DD)",
+                                              value=str(__import__("datetime").date.today()))
+                    ti_desc  = st.text_input("Description *")
                     if st.form_submit_button("＋ Log Time"):
-                        db.add_time_entry(matter["id"], ti_hours, ti_desc.strip(),
-                                          ti_rate, ti_lawyer.strip(), ti_date.strip())
-                        st.rerun()
+                        if ti_desc.strip():
+                            db.add_time_entry(matter["id"], ti_hours, ti_desc.strip(),
+                                              ti_rate, entry_date=ti_date.strip())
+                            st.rerun()
                 entries = db.list_time_entries(matter["id"])
                 if entries:
                     total_h   = sum(e["hours"] for e in entries)
-                    total_val = sum(e["hours"] * (e["rate"] or 0) for e in entries)
+                    total_val = sum(e["hours"] * (e.get("rate") or 0) for e in entries)
                     m1, m2 = st.columns(2)
                     m1.metric("Total Hours", f"{total_h:.2f} h")
                     m2.metric("Total Value",  f"£{total_val:,.2f}")
                     st.divider()
                     for e in entries:
-                        st.text(f"{e['date']}  {e['hours']:.2f}h  £{(e['rate'] or 0):.0f}/hr  {e['description'] or '—'}  {e['lawyer'] or ''}")
+                        st.text(f"{str(e.get('entry_date',''))[:10]}  {e['hours']:.2f}h  "
+                                f"£{(e.get('rate') or 0):.0f}/hr  {e.get('description','—')}")
                 else:
                     st.markdown('<div class="empty-list">No time entries yet.</div>', unsafe_allow_html=True)
 
-            # Remaining tabs are placeholders linked to existing tools
-            for tab_obj, label in zip(m_tabs[4:], [
-                "Documents", "AI Reviews", "Drafts", "Deadlines",
-                "Timeline", "Evidence", "Billing", "Audit History",
-            ]):
+            # Documents
+            with m_tabs[4]:
+                docs = db.list_documents(matter_id=matter["id"])
+                if docs:
+                    for d in docs:
+                        vis = d.get("visibility","internal")
+                        vis_icon = {"internal":"🔒","shared_with_client":"🟢","client_upload":"📤","final":"🏁","draft":"📝"}.get(vis,"📄")
+                        c1, c2, c3 = st.columns([4, 2, 1])
+                        c1.markdown(f"{vis_icon} **{d['name']}**")
+                        c2.caption(vis.replace("_"," ").title())
+                        c3.caption(str(d.get("created_at",""))[:10])
+                else:
+                    st.info("No documents yet. Upload via the Document Library.")
+                st.markdown("<br>", unsafe_allow_html=True)
+                up_file = st.file_uploader("Upload document to this matter", key=f"mdoc_{matter['id']}")
+                vis_choice = st.selectbox("Visibility", ["internal","shared_with_client","draft","final"],
+                                          key=f"mvis_{matter['id']}")
+                if st.button("Upload", key=f"mup_{matter['id']}") and up_file:
+                    db.add_document(up_file.name, matter["id"], file_type=up_file.type,
+                                    file_size=up_file.size, visibility=vis_choice)
+                    st.success(f"✅ {up_file.name} uploaded.")
+                    st.rerun()
+
+            # Members
+            with m_tabs[5]:
+                members = db.get_matter_members(matter["id"])
+                ROLE_ICONS = {"lead_lawyer":"⭐","lawyer":"⚖️","staff":"👤","client":"🏢","intern":"🎓"}
+                if members:
+                    for mem in members:
+                        p = mem.get("profiles") or {}
+                        c1, c2, c3 = st.columns([3, 2, 1])
+                        c1.text(p.get("full_name","—"))
+                        c2.text(f"{ROLE_ICONS.get(mem['role'],'👤')} {mem['role'].replace('_',' ').title()}")
+                        c3.text(p.get("email","—"))
+                else:
+                    st.caption("No members assigned yet.")
+                st.markdown("<br>", unsafe_allow_html=True)
+                all_profiles = db.list_profiles()
+                member_ids = {m["profile_id"] for m in members}
+                opts = {f"{p['full_name']} ({p['role']})": p["id"] for p in all_profiles if p["id"] not in member_ids}
+                if opts:
+                    c1, c2, c3 = st.columns([3, 2, 1])
+                    add_who  = c1.selectbox("Add member", list(opts.keys()), key=f"madd_who_{matter['id']}")
+                    add_role = c2.selectbox("Role", ["lawyer","staff","client","intern","lead_lawyer"], key=f"madd_role_{matter['id']}")
+                    if c3.button("Add", key=f"madd_btn_{matter['id']}", type="primary"):
+                        db.add_matter_member(matter["id"], opts[add_who], add_role)
+                        st.rerun()
+
+            # Discussion shortcut
+            with m_tabs[6]:
+                unread = db.unread_message_count(matter["id"])
+                if unread > 0:
+                    st.warning(f"🔔 {unread} unread message(s) in this matter.")
+                if st.button("💬 Open Matter Discussion", type="primary", key=f"disc_btn_{matter['id']}"):
+                    st.session_state["discussion_matter_id"] = matter["id"]
+                    st.switch_page("pages/p_matter_discussion.py")
+                st.caption("Full discussion thread, internal notes, and file attachments are in the Discussion page.")
+
+            # AI / Drafts / Deadlines / Billing / Audit placeholders
+            for tab_obj, label, icon in zip(m_tabs[7:], ["AI Reviews","Drafts","Deadlines","Billing","Audit"], ["🔍","📝","⏰","💼","📋"]):
                 with tab_obj:
                     st.markdown(
-                        f'<div class="empty-list">💡 Use the <strong>{label}</strong> section in the main sidebar to work with files linked to this matter.</div>',
-                        unsafe_allow_html=True,
+                        f'<div class="empty-list">{icon} Use the <strong>{label}</strong> section '
+                        f'in the sidebar to work with this matter.</div>', unsafe_allow_html=True,
                     )
 
-        if st.button("← Back to Matters list"):
+        if st.button("← Back to list"):
             st.session_state.selected_matter_id = None
             st.rerun()
 
-# ── CLIENTS ──────────────────────────────────────────────────────────────────
+# ── CLIENTS ────────────────────────────────────────────────────────
 with tab_clients:
     if "show_new_client" not in st.session_state:
         st.session_state.show_new_client = False
@@ -257,17 +328,20 @@ with tab_clients:
             c_name    = fc1.text_input("Full Name *", placeholder="Jane Smith")
             c_company = fc2.text_input("Company / Firm", placeholder="Smith & Co Ltd")
             fc3, fc4, fc5 = st.columns(3)
-            c_email   = fc3.text_input("Email", placeholder="jane@example.com")
-            c_phone   = fc4.text_input("Phone", placeholder="+44 7700 900000")
-            c_type    = fc5.selectbox("Client Type", ["Individual", "Company", "Government", "NGO", "Other"])
+            c_email   = fc3.text_input("Email",  placeholder="jane@example.com")
+            c_phone   = fc4.text_input("Phone",  placeholder="+250 7xx xxx xxx")
+            c_type    = fc5.selectbox("Client Type", ["individual","company","government","ngo","other"])
             c_notes   = st.text_area("Notes", height=60)
             fs1, fs2, _ = st.columns(3)
             if fs1.form_submit_button("💾 Save Client", type="primary", use_container_width=True):
                 if not c_name.strip():
                     st.error("Client name is required.")
                 else:
-                    db.create_client(c_name.strip(), c_email.strip(), c_phone.strip(),
-                                     c_company.strip(), c_type, c_notes.strip())
+                    db.create_client(
+                        name=c_name.strip(), email=c_email.strip(),
+                        phone=c_phone.strip(), company_name=c_company.strip(),
+                        client_type=c_type, notes=c_notes.strip(),
+                    )
                     st.session_state.show_new_client = False
                     st.success(f"✅ Client '{c_name}' added.")
                     st.rerun()
@@ -281,75 +355,54 @@ with tab_clients:
             '<div class="empty-list" style="margin-top:1rem">'
             '👥 No clients yet.<br>'
             '<small>Click <strong>＋ Add Client</strong> to add your first client.</small>'
-            '</div>',
-            unsafe_allow_html=True,
+            '</div>', unsafe_allow_html=True,
         )
     else:
-        ch = st.columns([2.5, 2, 1.5, 1, 0.8])
-        for col, lbl in zip(ch, ["Name", "Company", "Email", "Type", "Status"]):
+        ch = st.columns([2.5, 2, 1.5, 1.5, 0.8])
+        for col, lbl in zip(ch, ["Name", "Company", "Email", "Type", "Active"]):
             col.markdown(f"**{lbl}**")
         st.divider()
         for c in clients:
-            cr = st.columns([2.5, 2, 1.5, 1, 0.8])
-            cr[0].text(c["name"])
-            cr[1].text(c["company"] or "—")
-            cr[2].text(c["email"] or "—")
-            cr[3].text(c["type"] or "—")
-            badge = "🟢" if c["status"] == "Active" else "🔴"
-            cr[4].text(badge)
+            cr = st.columns([2.5, 2, 1.5, 1.5, 0.8])
+            cr[0].text(c.get("name",""))
+            cr[1].text(c.get("company_name") or "—")
+            cr[2].text(c.get("email") or "—")
+            cr[3].text((c.get("client_type") or "").title())
+            cr[4].text("🟢" if c.get("is_active") else "🔴")
         st.caption(f"{len(clients)} clients")
 
-# ── LEADS ─────────────────────────────────────────────────────────
-with tab_leads:
-    placeholder_feature(
-        "🔮", "Lead Management",
-        "Track prospective clients and convert them into active matters once engaged.",
-        ["Log new leads from enquiries", "Track lead status (new, contacted, quoted, converted)",
-         "Convert lead to matter with one click", "Generate initial advice letters"],
-        ["Lead pipeline view", "Conversion funnel metrics", "Automated follow-up log"],
-    )
-
-# ── CONFLICT CHECK ────────────────────────────────────────────────
+# ── CONFLICT CHECK ─────────────────────────────────────────────────
 with tab_conflict:
     group_header("Conflict Check")
-    st.markdown("Check a new party name against all existing clients and matters.")
+    st.markdown("Check a party name against all existing clients and matters.")
     search_party = st.text_input("Party name to screen", placeholder="e.g. Acme Corp or John Smith")
     if st.button("🔍 Run Conflict Check", disabled=not search_party.strip()):
-        name_lower = search_party.strip().lower()
+        name_lower  = search_party.strip().lower()
         all_clients = db.list_clients()
         all_matters = db.list_matters()
-        client_hits = [c for c in all_clients if name_lower in c["name"].lower() or name_lower in (c.get("company") or "").lower()]
-        matter_hits = [m for m in all_matters if name_lower in m["title"].lower()]
+        client_hits = [c for c in all_clients if name_lower in (c.get("name") or "").lower()
+                       or name_lower in (c.get("company_name") or "").lower()]
+        matter_hits = [m for m in all_matters if name_lower in m["title"].lower()
+                       or name_lower in (m.get("opposing_party") or "").lower()]
         if client_hits or matter_hits:
             st.warning(f"⚠️ Potential conflict found for **'{search_party}'**.")
             if client_hits:
                 st.markdown("**Matching clients:**")
                 for c in client_hits:
-                    st.markdown(f"- {c['name']} ({c.get('company') or 'Individual'}) — Status: {c['status']}")
+                    st.markdown(f"- {c['name']} ({c.get('company_name') or 'Individual'})")
             if matter_hits:
                 st.markdown("**Matching matters:**")
                 for m in matter_hits:
-                    st.markdown(f"- {m['ref']}: {m['title']} — {m['status']}")
+                    st.markdown(f"- {m.get('ref','')}: {m['title']} — {m.get('status','')}")
         else:
-            st.success(f"✅ No conflicts found for **'{search_party}'** in current client or matter database.")
+            st.success(f"✅ No conflicts found for **'{search_party}'**.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    placeholder_feature(
-        "⚖️", "Full Conflict Screening",
-        "Advanced conflict engine: screen against all related parties, opposing counsel, and historical matters.",
-        ["Screen against parties, directors, and related entities",
-         "Compare against historical (closed) matters",
-         "Flag potential conflicts with confidence score",
-         "Generate conflict-clear certificate"],
-        ["Conflict report", "Clear certificate", "Flagged conflicts list with detail"],
-    )
-
-# ── ENGAGEMENT LETTERS ────────────────────────────────────────────
+# ── ENGAGEMENT LETTERS ─────────────────────────────────────────────
 with tab_engagement:
     placeholder_feature(
         "📜", "Engagement Letters",
         "Generate and manage client engagement letters for new matters.",
-        ["Draft engagement letters from matter details", "Include scope, fees, terms, and retainer info",
+        ["Draft engagement letters from matter details", "Include scope, fees, and terms",
          "Send for e-signature", "Log signed versions in matter"],
-        ["Engagement letter draft (Word/PDF)", "Signature-ready document", "Signed copy stored in matter"],
+        ["Engagement letter draft (Word/PDF)", "Signed copy stored in matter"],
     )

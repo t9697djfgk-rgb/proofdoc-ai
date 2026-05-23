@@ -4,7 +4,9 @@ from utils.shared.styles import slim_header, disclaimer, confidentiality_notice,
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import download_json
 
+from utils.auth import require_lawyer
 api_key = setup_page()
+require_lawyer()
 slim_header("🧪", "Evidence & Witnesses", "Analyse witness statements, identify contradictions, and prepare cross-examination")
 disclaimer()
 confidentiality_notice()

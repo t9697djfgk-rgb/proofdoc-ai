@@ -2,8 +2,10 @@ import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, group_header, section
 from utils.shared.export_utils import download_json
+from utils.auth import require_lawyer
 
 api_key = setup_page()
+user = require_lawyer()
 slim_header("🔬", "Research", "Legal research, case summaries, statute explainers, and translation tools")
 
 tab_research, tab_translation = st.tabs(["🔬 Research Tools", "🌍 Translation & Terminology"])
@@ -22,6 +24,18 @@ with tab_research:
         c1, c2 = st.columns(2)
         lr_jur  = c1.text_input("Jurisdiction", placeholder="e.g. UK, Rwandan law, International", key="lr_jur")
         lr_area = c2.text_input("Area of Law", placeholder="e.g. Contract law, Tort, Criminal", key="lr_area")
+        # Rwanda law context toggle
+        is_rwanda = any(kw in (lr_jur or "").lower() for kw in ("rwanda", "rwandan", "kigali"))
+        rwanda_ctx = ""
+        if is_rwanda:
+            try:
+                from utils.rwanda_laws import build_citation_context
+                rwanda_ctx = build_citation_context(f"{lr_area} {question[:80]}")
+                if rwanda_ctx:
+                    st.info("📚 Verified Rwanda laws from amategeko.gov.rw will be injected into this research.")
+            except Exception:
+                pass
+
         if st.button("🔬 Research", type="primary", disabled=not api_key, key="lr_btn"):
             if not question.strip():
                 st.warning("⚠️ Enter a legal question first.")
@@ -29,7 +43,10 @@ with tab_research:
                 from utils.research_tools import LegalResearchAssistant
                 with st.spinner("Researching with Claude Opus 4.7…"):
                     try:
-                        result = LegalResearchAssistant(api_key).research(question.strip(), lr_jur, lr_area)
+                        result = LegalResearchAssistant(api_key).research(
+                            question.strip(), lr_jur, lr_area,
+                            extra_context=rwanda_ctx,
+                        )
                         st.session_state.lr_result = result
                         st.success("✅ Research complete!")
                     except Exception as exc:

@@ -1,142 +1,139 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, group_header, placeholder_feature, section
+from utils.shared.styles import slim_header, section
+from utils.auth import require_auth, reset_password
+import utils.database as db
 
 setup_page()
-slim_header("⚙️", "Settings", "Configure your profile, firm, team, AI preferences, and security")
+user = require_auth()
 
-tab_profile, tab_org, tab_team, tab_ai, tab_security = st.tabs([
-    "👤 Profile", "🏛️ Organisation", "👥 Users & Roles",
-    "🤖 AI Settings", "🔒 Security & Data",
-])
+slim_header("⚙️", "Settings", f"Profile, organisation, and security settings")
+
+tabs = ["👤 Profile", "🤖 AI Settings", "🔒 Security"]
+if user["role"] in ("admin", "lawyer"):
+    tabs.insert(1, "🏛️ Organisation")
+
+tab_objs = st.tabs(tabs)
+tab_map = {name: tab for name, tab in zip(tabs, tab_objs)}
 
 # ── Profile ───────────────────────────────────────────────────────
-with tab_profile:
+with tab_map["👤 Profile"]:
     section("👤 Your Profile")
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.markdown(
-            '<div style="width:80px;height:80px;background:#1e3a5f;border-radius:50%;'
-            'display:flex;align-items:center;justify-content:center;font-size:2rem;color:white">👤</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Change Photo", use_container_width=True):
-            st.info("Photo upload coming soon.")
+
+    ROLE_ICONS = {"admin": "🛡️", "lawyer": "⚖️", "staff": "👤", "client": "🏢", "intern": "🎓"}
+    icon = ROLE_ICONS.get(user["role"], "👤")
+
+    c1, c2 = st.columns([1, 3])
+    c1.markdown(
+        f'<div style="width:72px;height:72px;background:#1e3a5f;border-radius:50%;'
+        f'display:flex;align-items:center;justify-content:center;font-size:1.8rem">'
+        f'{icon}</div>',
+        unsafe_allow_html=True,
+    )
     with c2:
-        first_name = st.text_input("First Name", placeholder="Jane")
-        last_name = st.text_input("Last Name", placeholder="Smith")
-        email = st.text_input("Email", placeholder="jane.smith@lawfirm.com")
-        role = st.text_input("Role / Title", placeholder="e.g. Senior Associate, Partner")
-    c1b, c2b, _ = st.columns(3)
-    if c1b.button("💾 Save Profile", type="primary", use_container_width=True):
-        st.success("✅ Profile saved. (Persistence coming soon)")
-    if c2b.button("🔑 Change Password", use_container_width=True):
-        st.info("Password management coming soon.")
+        st.markdown(f"**{user['full_name']}**")
+        st.caption(f"{user.get('title') or user['role'].title()} · {user['organization_name']}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    placeholder_feature(
-        "👤", "Full Profile Management",
-        "Manage your complete professional profile, notification preferences, and appearance settings.",
-        ["Update personal details and profile photo",
-         "Set notification preferences (email, in-app, SMS)",
-         "Choose preferred language and timezone",
-         "Manage two-factor authentication"],
-        ["Updated profile", "Notification settings saved",
-         "Personalised workspace preferences"],
-    )
+    with st.form("profile_form"):
+        c1, c2 = st.columns(2)
+        new_name  = c1.text_input("Full Name *", value=user.get("full_name", ""), key="pf_name")
+        new_title = c2.text_input("Title / Role", value=user.get("title", "") or "", key="pf_title",
+                                   placeholder="e.g. Senior Associate")
+        if st.form_submit_button("💾 Save Profile", type="primary"):
+            if not new_name.strip():
+                st.warning("Name is required.")
+            else:
+                db.get_db().table("profiles").update({
+                    "full_name": new_name.strip(),
+                    "title": new_title.strip() or None,
+                }).eq("id", user["id"]).execute()
+                st.session_state["user"]["full_name"] = new_name.strip()
+                st.session_state["user"]["title"] = new_title.strip() or None
+                st.success("✅ Profile updated.")
+                st.rerun()
 
 # ── Organisation ──────────────────────────────────────────────────
-with tab_org:
-    section("🏛️ Organisation Settings")
-    org_name = st.text_input("Firm / Organisation Name", placeholder="e.g. Smith & Jones LLP")
-    org_type = st.selectbox("Organisation Type", [
-        "Law firm", "In-house legal team", "Barrister chambers",
-        "Legal aid organisation", "Regulatory body", "Other",
-    ])
-    jurisdiction = st.selectbox("Primary Jurisdiction", [
-        "UK", "US", "EU", "Rwanda", "International", "Other",
-    ])
-    c1, _ = st.columns(2)
-    if c1.button("💾 Save Organisation Settings", type="primary", use_container_width=True):
-        st.success("✅ Organisation settings saved. (Persistence coming soon)")
+if "🏛️ Organisation" in tab_map:
+    with tab_map["🏛️ Organisation"]:
+        section("🏛️ Organisation Details")
+        org_resp = (
+            db.get_db().table("organizations")
+            .select("*")
+            .eq("id", user["organization_id"])
+            .maybe_single()
+            .execute()
+        )
+        org = org_resp.data or {}
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    placeholder_feature(
-        "🏛️", "Firm Branding",
-        "Apply your firm's branding — logo, colours, and letterhead — to all generated documents.",
-        ["Upload firm logo for documents and exports",
-         "Set primary and secondary brand colours",
-         "Configure letterhead template for memos and letters",
-         "Apply branding to all AI-generated outputs"],
-        ["Branded document outputs", "Firm logo in headers",
-         "Consistent letterhead across all exports"],
-    )
+        with st.form("settings_org_form"):
+            c1, c2 = st.columns(2)
+            org_name  = c1.text_input("Firm Name",  value=org.get("name", ""),    key="so_name")
+            org_email = c2.text_input("Email",       value=org.get("email", ""),   key="so_email")
+            org_phone = c1.text_input("Phone",       value=org.get("phone", ""),   key="so_phone")
+            org_addr  = c2.text_input("Address",     value=org.get("address", ""), key="so_addr")
+            if st.form_submit_button("💾 Save Changes", type="primary"):
+                db.get_db().table("organizations").update({
+                    "name": org_name, "email": org_email,
+                    "phone": org_phone, "address": org_addr,
+                }).eq("id", user["organization_id"]).execute()
+                st.session_state["user"]["organization_name"] = org_name
+                st.success("✅ Organisation details updated.")
+                st.rerun()
 
-# ── Users & Roles ─────────────────────────────────────────────────
-with tab_team:
-    placeholder_feature(
-        "👥", "Users & Role Management",
-        "Manage team members, assign roles, and control access to sections and matters.",
-        ["Invite team members by email",
-         "Assign roles: Admin, Partner, Associate, Paralegal, Support, Client",
-         "Set section-level permissions per role",
-         "Manage matter-level access restrictions"],
-        ["User directory", "Role permission matrix",
-         "Pending invitation list", "Access change audit log"],
-    )
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        c1.metric("Subscription Plan",   (org.get("subscription_plan") or "starter").title())
+        c2.metric("Subscription Status", (org.get("subscription_status") or "active").title())
 
 # ── AI Settings ───────────────────────────────────────────────────
-with tab_ai:
+with tab_map["🤖 AI Settings"]:
     section("🤖 AI Configuration")
     st.markdown("**Current AI Provider:** Anthropic Claude Opus 4.7")
-    st.markdown("**API Key Status:** Loaded from secrets")
+    try:
+        _ = st.secrets["ANTHROPIC_API_KEY"]
+        st.success("✅ API key loaded from secrets")
+    except Exception:
+        st.warning("⚠️ API key not found in secrets.toml — enter it in the sidebar to use AI tools")
+
+    st.info(
+        "The API key is stored in `.streamlit/secrets.toml` and is never committed to version control. "
+        "On Railway/Streamlit Cloud, add it via the environment variables / secrets panel."
+    )
+
+# ── Security ──────────────────────────────────────────────────────
+with tab_map["🔒 Security"]:
+    section("🔑 Change Password")
+    with st.form("change_pw_form"):
+        new_pw1 = st.text_input("New Password", type="password", key="cpw1")
+        new_pw2 = st.text_input("Confirm New Password", type="password", key="cpw2")
+        if st.form_submit_button("Update Password", type="primary"):
+            if not new_pw1:
+                st.warning("Enter a new password.")
+            elif len(new_pw1) < 8:
+                st.warning("Password must be at least 8 characters.")
+            elif new_pw1 != new_pw2:
+                st.warning("Passwords do not match.")
+            else:
+                result = reset_password(user["id"], new_pw1)
+                if result["ok"]:
+                    st.success("✅ Password updated successfully.")
+                else:
+                    st.error(f"❌ {result['error']}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.info(
-        "🔑 Your API key is stored in `.streamlit/secrets.toml` and is never committed to version control. "
-        "On Streamlit Cloud, add it via the Secrets management panel."
-    )
-
-    group_header("AI Preferences (Coming Soon)")
-    placeholder_feature(
-        "🤖", "AI Settings",
-        "Configure AI model preferences, default instructions, and jurisdiction-specific behaviour.",
-        ["Select preferred Claude model (Opus / Sonnet / Haiku)",
-         "Set default jurisdiction and legal style for all AI tools",
-         "Add firm-specific instructions appended to all prompts",
-         "Configure output language and terminology preferences"],
-        ["Saved AI preferences applied across all tools",
-         "Firm-specific AI behaviour", "Model cost vs. quality balance control"],
-    )
-
-# ── Security & Data ───────────────────────────────────────────────
-with tab_security:
-    section("🔒 Security & Data Retention")
-    group_header("Current Security Status")
-    for label, status, color in [
-        ("API Key", "Loaded from secrets.toml (not committed to repo)", "#16a34a"),
-        ("File Processing", "In-memory only — files auto-deleted after session", "#16a34a"),
-        ("Data Retention", "No persistent storage — session-only", "#16a34a"),
-        ("AI Training", "Your data is never used to train AI models", "#16a34a"),
+    section("🔒 Security Status")
+    for label, status in [
+        ("API Key",       "Stored in secrets.toml — not committed to repo"),
+        ("File Processing", "In-memory only — files auto-deleted after session"),
+        ("AI Training",   "Your data is never used to train AI models"),
+        ("Database",      "Supabase with organisation-level tenant isolation"),
     ]:
         st.markdown(
-            f'<div class="settings-row">'
-            f'<div><h5>{label}</h5><p>{status}</p></div>'
-            f'<span style="color:{color};font-size:1.2rem">✓</span>'
+            f'<div style="display:flex;justify-content:space-between;padding:.5rem 0;'
+            f'border-bottom:1px solid #e2e8f0">'
+            f'<div><strong>{label}</strong><br><small style="color:#64748b">{status}</small></div>'
+            f'<span style="color:#16a34a;font-size:1.2rem">✓</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    placeholder_feature(
-        "🔒", "Advanced Security Settings",
-        "Configure 2FA, SSO, session timeouts, and IP restrictions for enterprise deployments.",
-        ["Enable two-factor authentication (2FA)",
-         "Configure SSO / SAML integration",
-         "Set automatic session timeout duration",
-         "Restrict access to approved IP ranges",
-         "Configure data residency requirements"],
-        ["2FA enabled for all users", "SSO configured and tested",
-         "Session policy applied", "IP allowlist enforced"],
-    )

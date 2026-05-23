@@ -4,7 +4,9 @@ from utils.shared.styles import slim_header, disclaimer, section, placeholder_fe
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import download_json
 
+from utils.auth import require_lawyer
 api_key = setup_page()
+require_lawyer()
 slim_header("🏛️", "Trial Workspace", "Court document review, filing checklists, timelines, and argument preparation")
 disclaimer()
 

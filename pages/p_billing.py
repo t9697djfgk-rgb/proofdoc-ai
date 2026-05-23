@@ -1,9 +1,11 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, group_header, section, placeholder_feature
-from utils import database as db
+from utils.auth import require_lawyer
+import utils.database as db
 
 setup_page()
+user = require_lawyer()
 slim_header("💼", "Billing & Time", "Time tracking, expenses, invoicing, payments, and financial reporting")
 
 tab_time, tab_invoices, tab_reports = st.tabs([

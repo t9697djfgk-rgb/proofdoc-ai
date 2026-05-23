@@ -40,11 +40,14 @@ class LegalResearchAssistant:
     def __init__(self, api_key: str):
         self.client = anthropic.Anthropic(api_key=api_key)
 
-    def research(self, question: str, jurisdiction: str, area_of_law: str) -> dict:
+    def research(self, question: str, jurisdiction: str, area_of_law: str,
+                 extra_context: str = "") -> dict:
+        ctx_block = f"\n\n{extra_context}\n" if extra_context else ""
         prompt = (
             f"Legal Question: {question}\n"
             f"Jurisdiction: {jurisdiction}\n"
-            f"Area of Law: {area_of_law}\n\n"
+            f"Area of Law: {area_of_law}\n"
+            f"{ctx_block}\n"
             "Return ONLY valid JSON:\n"
             "{\n"
             '  "answer": "structured plain-English answer",\n'

@@ -3,7 +3,9 @@ from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, disclaimer, section
 from utils.shared.export_utils import action_row
 
+from utils.auth import require_lawyer
 api_key = setup_page()
+require_lawyer()
 slim_header("👤", "Client Intake", "Convert client facts into a structured lawyer handover note")
 disclaimer()
 

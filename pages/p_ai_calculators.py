@@ -3,7 +3,9 @@ from datetime import date, timedelta
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, group_header, section
 
+from utils.auth import require_lawyer
 api_key = setup_page()
+require_lawyer()
 slim_header("🧮", "Calculators", "Court deadlines, limitation periods, interest, and damages calculators")
 st.markdown(
     '<div class="disclaimer-box">ℹ️ <strong>Disclaimer:</strong> Calculators provide estimates only. '

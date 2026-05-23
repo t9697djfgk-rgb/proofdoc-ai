@@ -6,7 +6,9 @@ from utils.shared.styles import (
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import action_row, download_json, download_txt
 
+from utils.auth import require_lawyer
 api_key = setup_page()
+require_lawyer()
 slim_header("🔍", "Review", "AI-powered legal document review — grammar, risk, citations, and deadlines")
 disclaimer()
 

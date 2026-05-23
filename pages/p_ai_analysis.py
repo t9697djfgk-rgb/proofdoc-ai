@@ -4,7 +4,9 @@ from utils.shared.styles import slim_header, disclaimer, section, risk_badge, pl
 from utils.shared.document_input import document_input_ui, two_document_input_ui
 from utils.shared.export_utils import download_json
 
+from utils.auth import require_lawyer
 api_key = setup_page()
+require_lawyer()
 slim_header("📊", "Analysis", "Contract summaries, due diligence, risk reports, and document comparison")
 disclaimer()
 
