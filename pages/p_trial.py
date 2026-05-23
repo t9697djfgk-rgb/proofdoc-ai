@@ -144,35 +144,199 @@ with tab2:
             if st.button("🔄 Reset", key="tg_rst", use_container_width=True):
                 st.session_state.pop("tg_result", None); st.rerun()
 
-# ── 3. Filing Checklist (placeholder) ────────────────────────────
+# ── 3. Filing Checklist ───────────────────────────────────────────
 with tab3:
-    placeholder_feature(
-        "📋", "Court Filing Checklist",
-        "Generate a jurisdiction-specific filing checklist for any court document or application.",
-        ["Select court and document type", "Receive step-by-step filing checklist",
-         "Attach required supporting documents", "Track completion and sign off"],
-        ["Itemised filing checklist", "Required attachments list",
-         "Court fees schedule", "Filing confirmation log"],
-    )
+    st.markdown("Generate a step-by-step court filing checklist for any document type and jurisdiction.")
+    c1, c2, c3 = st.columns(3)
+    fc_doc_type = c1.selectbox("Document Type", [
+        "Claim form", "Defence", "Reply", "Summary judgment application",
+        "Injunction application", "Appeal notice", "Witness statement",
+        "Skeleton argument", "Expert report", "Court bundle", "Other",
+    ], key="fc_dt")
+    fc_court    = c2.text_input("Court / Tribunal", placeholder="e.g. High Court, Commercial Court", key="fc_court")
+    fc_jur      = c3.selectbox("Jurisdiction", ["England & Wales", "Scotland", "Rwanda",
+                                                  "United States", "International / Other"], key="fc_jur")
+    fc_summary  = st.text_area("Brief Matter Summary", height=60,
+                                placeholder="2-3 sentences about the matter and stage of proceedings", key="fc_sum")
+    if st.button("📋 Generate Checklist", type="primary", disabled=not api_key, key="fc_btn"):
+        from utils.argument_builder import FilingChecklist
+        with st.spinner("Generating with Claude Opus 4.7…"):
+            try:
+                result3 = FilingChecklist(api_key).generate(fc_doc_type, fc_court, fc_jur, fc_summary)
+                st.session_state.fc_result = result3
+                st.success("✅ Checklist ready!")
+            except Exception as exc:
+                st.error(f"Generation failed: {exc}")
+    if st.session_state.get("fc_result"):
+        r = st.session_state.fc_result
+        st.divider()
+        st.markdown(f"### {r.get('title','Filing Checklist')}")
+        st.markdown(r.get("court_overview",""))
+        checklist = r.get("checklist", [])
+        if checklist:
+            section(f"✅ Checklist ({len(checklist)} steps)")
+            if "fc_completed" not in st.session_state:
+                st.session_state.fc_completed = set()
+            for item in checklist:
+                step = item.get("step", 0)
+                pri_icon = {"critical": "🔴", "important": "🟡", "standard": "🟢"}.get(item.get("priority",""), "⚪")
+                checked = st.checkbox(
+                    f"{pri_icon} **Step {step}: {item.get('task','')}**  ·  _{item.get('timing','')}_",
+                    key=f"fc_chk_{step}",
+                )
+                if checked:
+                    st.session_state.fc_completed.add(step)
+                if item.get("details"):
+                    st.caption(f"  {item['details']}")
+        if r.get("required_documents"):
+            section("📄 Required Documents")
+            for d in r["required_documents"]: st.markdown(f"- {d}")
+        if r.get("common_errors"):
+            section("⚠️ Common Errors to Avoid")
+            for e in r["common_errors"]: st.warning(e)
+        if r.get("court_fees"):
+            section("💷 Court Fees")
+            st.markdown(r["court_fees"])
+        if r.get("service_requirements"):
+            section("📮 Service Requirements")
+            st.markdown(r["service_requirements"])
+        c1, _, c3 = st.columns(3)
+        with c1: download_json("📥 Export Checklist (.json)", r, "filing_checklist.json", key="fc_dl")
+        with c3:
+            if st.button("🔄 Reset", key="fc_rst", use_container_width=True):
+                st.session_state.pop("fc_result", None)
+                st.session_state.pop("fc_completed", None)
+                st.rerun()
 
-# ── 4. Argument Builder (placeholder) ────────────────────────────
+# ── 4. Argument Builder ───────────────────────────────────────────
 with tab4:
-    placeholder_feature(
-        "💬", "Argument Builder",
-        "Structure legal arguments for submissions, memos, or oral advocacy using IRAC and CREAC frameworks.",
-        ["Enter issue, rule, and facts", "AI structures argument in IRAC / CREAC format",
-         "Anticipate counterarguments and rebuttals", "Export as submission-ready section"],
-        ["Structured legal argument", "Counterarguments and rebuttals",
-         "Authority references per point", "Argument outline for oral advocacy"],
-    )
+    st.markdown("Build structured legal arguments using IRAC / CREAC frameworks with counterarguments and authorities.")
+    ab_issue    = st.text_area("Legal Issue *", height=60,
+                                placeholder="e.g. Whether a binding contract was formed at the meeting on 1 June 2025")
+    c1, c2 = st.columns(2)
+    ab_outcome  = c1.text_input("Desired Outcome", placeholder="e.g. Establish that a contract was formed")
+    ab_framework= c2.selectbox("Argument Framework", ["IRAC", "CREAC", "IRAC with sub-arguments"], key="ab_fw")
+    ab_facts    = st.text_area("Key Facts", height=80, placeholder="Relevant facts supporting your argument…")
+    c3, c4, c5 = st.columns(3)
+    ab_jur      = c3.text_input("Jurisdiction", placeholder="e.g. English law", key="ab_jur")
+    ab_type     = c4.selectbox("Case Type", [
+        "Civil litigation", "Commercial dispute", "Employment",
+        "Criminal", "Administrative / Judicial review", "Arbitration",
+    ], key="ab_type")
+    if st.button("💬 Build Argument", type="primary", disabled=not api_key, key="ab_btn"):
+        if not ab_issue.strip():
+            st.warning("⚠️ Enter the legal issue first.")
+        else:
+            from utils.argument_builder import ArgumentBuilder
+            with st.spinner("Building with Claude Opus 4.7…"):
+                try:
+                    result4 = ArgumentBuilder(api_key).build(
+                        ab_issue, ab_facts, ab_outcome, ab_framework, ab_jur, ab_type)
+                    st.session_state.ab_result = result4
+                    st.success("✅ Argument built!")
+                except Exception as exc:
+                    st.error(f"Build failed: {exc}")
+    if st.session_state.get("ab_result"):
+        r = st.session_state.ab_result
+        st.divider()
+        st.markdown(f"## {r.get('argument_title','')}")
+        arg = r.get("structured_argument", {})
+        ab_tabs = st.tabs(["🏗️ Structure", "📚 Authorities", "🔄 Sub-Arguments",
+                            "⚔️ Counterarguments", "⚠️ Weaknesses", "🗣️ Oral Points", "📄 Full Text"])
+        with ab_tabs[0]:
+            for label, key in [("Issue", "issue"), ("Rule", "rule"),
+                                ("Application", "application"), ("Conclusion", "conclusion")]:
+                st.markdown(f"**{label}:**")
+                st.markdown(arg.get(key, ""))
+                st.markdown("---")
+        with ab_tabs[1]:
+            for a in r.get("key_authorities", []):
+                with st.expander(f"**{a.get('name','')}** `{a.get('citation','')}`"):
+                    st.markdown(f"**Principle:** {a.get('principle','')}")
+                    st.markdown(f"**How it helps:** {a.get('how_it_helps','')}")
+        with ab_tabs[2]:
+            for s in r.get("sub_arguments", []):
+                with st.expander(f"📌 {s.get('point','')}"):
+                    st.markdown(f"**Rule:** {s.get('rule','')}")
+                    st.markdown(f"**Application:** {s.get('application','')}")
+                    st.markdown(f"**Authority:** _{s.get('authority','')}_")
+        with ab_tabs[3]:
+            for ca in r.get("counterarguments", []):
+                with st.expander(f"⚔️ {ca.get('counterargument','')} ({ca.get('strength','')})"):
+                    st.markdown(f"**Rebuttal:** {ca.get('rebuttal','')}")
+        with ab_tabs[4]:
+            for w in r.get("weaknesses", []): st.warning(w)
+        with ab_tabs[5]:
+            for p in r.get("oral_advocacy_points", []):
+                st.markdown(f"→ {p}")
+        with ab_tabs[6]:
+            st.markdown(r.get("full_written_argument",""))
+        c1, _, c3 = st.columns(3)
+        with c1: download_json("📥 Export Argument (.json)", r, "legal_argument.json", key="ab_dl")
+        with c3:
+            if st.button("🔄 Reset", key="ab_rst", use_container_width=True):
+                st.session_state.pop("ab_result", None); st.rerun()
 
-# ── 5. Hearing Prep Notes (placeholder) ─────────────────────────
+# ── 5. Hearing Prep Notes ─────────────────────────────────────────
 with tab5:
-    placeholder_feature(
-        "📝", "Hearing Preparation Notes",
-        "Prepare structured hearing notes covering key arguments, evidence, and anticipated questions.",
-        ["Enter matter summary and key issues", "AI drafts structured hearing notes",
-         "Include key authorities and evidential references", "Add judge/arbitrator background notes"],
-        ["Hearing prep document", "Key argument one-pagers", "Anticipated questions list",
-         "Evidence reference index"],
-    )
+    st.markdown("Generate structured hearing preparation notes including opening, key arguments, and anticipated questions.")
+    hp_summary = st.text_area("Matter Summary *", height=80,
+                               placeholder="Brief overview of the case, stage, and what this hearing decides")
+    hp_issues  = st.text_area("Key Issues for This Hearing", height=60,
+                               placeholder="e.g. (1) Whether injunction should be granted, (2) Costs")
+    c1, c2, c3 = st.columns(3)
+    hp_type    = c1.selectbox("Hearing Type", [
+        "Case management hearing", "Injunction application", "Summary judgment",
+        "Trial", "Appeal hearing", "Arbitration hearing", "Costs hearing", "Other",
+    ], key="hp_type")
+    hp_jur     = c2.text_input("Jurisdiction", placeholder="e.g. High Court, England", key="hp_jur")
+    hp_judge   = c3.text_input("Judge / Tribunal Notes", placeholder="e.g. Known to be strict on costs", key="hp_judge")
+    if st.button("📝 Generate Hearing Prep Notes", type="primary", disabled=not api_key, key="hp_btn"):
+        if not hp_summary.strip():
+            st.warning("⚠️ Enter a matter summary first.")
+        else:
+            from utils.argument_builder import HearingPrepGenerator
+            with st.spinner("Generating with Claude Opus 4.7…"):
+                try:
+                    result5 = HearingPrepGenerator(api_key).generate(
+                        hp_summary, hp_issues, hp_type, hp_judge, hp_jur)
+                    st.session_state.hp_result = result5
+                    st.success("✅ Hearing notes ready!")
+                except Exception as exc:
+                    st.error(f"Generation failed: {exc}")
+    if st.session_state.get("hp_result"):
+        r = st.session_state.hp_result
+        st.divider()
+        st.markdown(f"**Hearing Overview:** {r.get('hearing_overview','')}")
+        hp_tabs = st.tabs(["🎯 Objectives", "🗣️ Opening", "⚖️ Arguments", "❓ Questions",
+                            "📜 Closing", "✅ Logistics"])
+        with hp_tabs[0]:
+            for i, obj in enumerate(r.get("objectives",[]), 1):
+                st.markdown(f"**{i}.** {obj}")
+        with hp_tabs[1]:
+            st.markdown(r.get("opening_statement",""))
+        with hp_tabs[2]:
+            for arg in r.get("key_arguments", []):
+                with st.expander(f"📌 {arg.get('argument','')}"):
+                    st.markdown(f"**Authority:** {arg.get('supporting_authority','')}")
+                    st.markdown(f"**Evidence:** {arg.get('evidence_reference','')}")
+                    st.markdown(f"**Anticipated Response:** {arg.get('anticipated_response','')}")
+        with hp_tabs[3]:
+            for q in r.get("anticipated_questions", []):
+                with st.expander(f"❓ {q.get('question','')}"):
+                    st.markdown(q.get("answer",""))
+            if r.get("concessions_to_make"):
+                section("✅ Safe Concessions")
+                for c in r["concessions_to_make"]: st.info(c)
+            if r.get("lines_to_hold"):
+                section("🛑 Lines to Hold")
+                for l in r["lines_to_hold"]: st.error(l)
+        with hp_tabs[4]:
+            st.markdown(r.get("closing_summary",""))
+        with hp_tabs[5]:
+            for item in r.get("logistics_checklist",[]): st.checkbox(item, key=f"hp_log_{item[:20]}")
+        c1, _, c3 = st.columns(3)
+        with c1: download_json("📥 Export Hearing Notes (.json)", r, "hearing_prep.json", key="hp_dl")
+        with c3:
+            if st.button("🔄 Reset", key="hp_rst", use_container_width=True):
+                st.session_state.pop("hp_result", None); st.rerun()

@@ -217,25 +217,127 @@ with tab3:
                     unsafe_allow_html=True)
 
 
-# ── Tab 4: Split PDF (placeholder) ───────────────────────────────
+# ── Tab 4: Split PDF ──────────────────────────────────────────────
 with tab4:
-    from utils.shared.styles import placeholder_feature
-    placeholder_feature(
-        "✂️", "Split PDF",
-        "Extract specific pages or ranges from a PDF into separate files.",
-        ["Select page ranges to extract", "Split by chapter or bookmark",
-         "Batch extract multiple ranges", "Rename output files"],
-        ["Individual PDF files per selected range", "Named output files", "Zip archive for bulk splits"],
-    )
+    section("✂️ Split / Extract Pages from PDF")
+    import io as _io
+    sp_file = st.file_uploader("Upload PDF to split", type=["pdf"], key="sp_up")
+    if sp_file:
+        try:
+            import fitz as _fitz
+            sp_doc = _fitz.open(stream=sp_file.getbuffer(), filetype="pdf")
+            total_pages = len(sp_doc)
+            st.info(f"📄 **{sp_file.name}** · {total_pages} pages · {sp_file.size / 1024:.1f} KB")
+            sp_doc.close()
+
+            sp_mode = st.radio("Split Mode", ["Extract page range", "Split into individual pages",
+                                               "Split into equal parts"], horizontal=True, key="sp_mode")
+            if sp_mode == "Extract page range":
+                c1, c2 = st.columns(2)
+                sp_from = c1.number_input("From page", min_value=1, max_value=total_pages, value=1, key="sp_from")
+                sp_to   = c2.number_input("To page",   min_value=1, max_value=total_pages, value=min(total_pages, 5), key="sp_to")
+                sp_name = st.text_input("Output filename", value="extracted_pages.pdf", key="sp_name")
+                if st.button("✂️ Extract Pages", type="primary", key="sp_btn_range"):
+                    sp_doc2 = _fitz.open(stream=sp_file.getbuffer(), filetype="pdf")
+                    out_doc = _fitz.open()
+                    out_doc.insert_pdf(sp_doc2, from_page=int(sp_from)-1, to_page=int(sp_to)-1)
+                    buf = _io.BytesIO()
+                    out_doc.save(buf)
+                    sp_doc2.close()
+                    out_doc.close()
+                    st.download_button("📥 Download Extracted Pages", buf.getvalue(),
+                                       sp_name, "application/pdf", use_container_width=True, key="sp_dl_range")
+                    st.success(f"✅ Pages {sp_from}–{sp_to} extracted ({int(sp_to)-int(sp_from)+1} pages)")
+
+            elif sp_mode == "Split into individual pages":
+                st.info(f"This will create {total_pages} separate PDF files, bundled in a ZIP.")
+                if st.button("✂️ Split into Pages", type="primary", key="sp_btn_all"):
+                    import zipfile as _zf
+                    sp_doc3 = _fitz.open(stream=sp_file.getbuffer(), filetype="pdf")
+                    zip_buf = _io.BytesIO()
+                    with _zf.ZipFile(zip_buf, "w", _zf.ZIP_DEFLATED) as zf:
+                        for i in range(total_pages):
+                            pg_doc = _fitz.open()
+                            pg_doc.insert_pdf(sp_doc3, from_page=i, to_page=i)
+                            pg_buf = _io.BytesIO()
+                            pg_doc.save(pg_buf)
+                            pg_doc.close()
+                            zf.writestr(f"page_{i+1:04d}.pdf", pg_buf.getvalue())
+                    sp_doc3.close()
+                    st.download_button("📥 Download ZIP (all pages)", zip_buf.getvalue(),
+                                       "split_pages.zip", "application/zip", use_container_width=True, key="sp_dl_all")
+                    st.success(f"✅ {total_pages} pages split")
+
+            else:  # Equal parts
+                n_parts = st.number_input("Number of equal parts", min_value=2,
+                                          max_value=total_pages, value=2, key="sp_parts")
+                if st.button("✂️ Split into Parts", type="primary", key="sp_btn_parts"):
+                    import zipfile as _zf
+                    import math as _math
+                    sp_doc4 = _fitz.open(stream=sp_file.getbuffer(), filetype="pdf")
+                    pages_per_part = _math.ceil(total_pages / int(n_parts))
+                    zip_buf2 = _io.BytesIO()
+                    with _zf.ZipFile(zip_buf2, "w", _zf.ZIP_DEFLATED) as zf:
+                        for p in range(int(n_parts)):
+                            start = p * pages_per_part
+                            end   = min(start + pages_per_part - 1, total_pages - 1)
+                            if start > total_pages - 1:
+                                break
+                            pt_doc = _fitz.open()
+                            pt_doc.insert_pdf(sp_doc4, from_page=start, to_page=end)
+                            pt_buf = _io.BytesIO()
+                            pt_doc.save(pt_buf)
+                            pt_doc.close()
+                            zf.writestr(f"part_{p+1}_pages_{start+1}-{end+1}.pdf", pt_buf.getvalue())
+                    sp_doc4.close()
+                    st.download_button("📥 Download ZIP (all parts)", zip_buf2.getvalue(),
+                                       "split_parts.zip", "application/zip", use_container_width=True, key="sp_dl_parts")
+                    st.success(f"✅ Split into {n_parts} parts")
+        except Exception as exc:
+            st.error(f"Error: {exc}")
+    else:
+        st.markdown('<div class="empty-list">Upload a PDF to split it.</div>', unsafe_allow_html=True)
 
 
-# ── Tab 5: Compress PDF (placeholder) ────────────────────────────
+# ── Tab 5: Compress PDF ───────────────────────────────────────────
 with tab5:
-    from utils.shared.styles import placeholder_feature
-    placeholder_feature(
-        "🗜️", "Compress PDF",
-        "Reduce PDF file size for email, upload, or court filing size limits.",
-        ["Select compression level (light, medium, aggressive)",
-         "Preview file size before download", "Batch compress multiple files"],
-        ["Compressed PDF", "Size reduction report (before vs. after)"],
-    )
+    section("🗜️ Compress PDF")
+    import io as _io2
+    cmp_file = st.file_uploader("Upload PDF to compress", type=["pdf"], key="cmp_up")
+    if cmp_file:
+        original_size = len(cmp_file.getbuffer())
+        st.info(f"📄 **{cmp_file.name}** · Original size: {original_size / 1024:.1f} KB")
+        compression_level = st.radio("Compression Level",
+                                     ["Light (best quality)", "Medium (balanced)", "Aggressive (smallest file)"],
+                                     horizontal=True, key="cmp_level")
+        if st.button("🗜️ Compress PDF", type="primary", key="cmp_btn"):
+            try:
+                import fitz as _fitz2
+                doc = _fitz2.open(stream=cmp_file.getbuffer(), filetype="pdf")
+                buf = _io2.BytesIO()
+                garbage_level = {"Light (best quality)": 1,
+                                  "Medium (balanced)": 3,
+                                  "Aggressive (smallest file)": 4}[compression_level]
+                doc.save(buf, deflate=True, garbage=garbage_level, clean=True,
+                         deflate_images=True, deflate_fonts=True)
+                doc.close()
+                compressed_size = len(buf.getvalue())
+                saved_pct = (1 - compressed_size / original_size) * 100
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Original Size",    f"{original_size / 1024:.1f} KB")
+                c2.metric("Compressed Size",  f"{compressed_size / 1024:.1f} KB")
+                c3.metric("Size Reduction",   f"{max(0, saved_pct):.1f}%",
+                          delta=f"−{(original_size - compressed_size) / 1024:.1f} KB")
+
+                out_name = cmp_file.name.replace(".pdf", "_compressed.pdf")
+                st.download_button("📥 Download Compressed PDF", buf.getvalue(),
+                                   out_name, "application/pdf", use_container_width=True, key="cmp_dl")
+                if saved_pct < 5:
+                    st.info("ℹ️ PDF was already well-optimised — minimal reduction possible.")
+                else:
+                    st.success(f"✅ Compressed by {saved_pct:.1f}% ({original_size//1024}KB → {compressed_size//1024}KB)")
+            except Exception as exc:
+                st.error(f"Compression failed: {exc}")
+    else:
+        st.markdown('<div class="empty-list">Upload a PDF to compress it.</div>', unsafe_allow_html=True)

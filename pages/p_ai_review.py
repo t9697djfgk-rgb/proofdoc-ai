@@ -269,14 +269,69 @@ with tab4:
             if st.button("🔄 Reset", use_container_width=True, key="de_rst"):
                 st.session_state.pop("de_result", None); st.rerun()
 
-# ── 5. Legal Issue Spotter (placeholder) ─────────────────────────
+# ── 5. Legal Issue Spotter ────────────────────────────────────────
 with tab5:
-    placeholder_feature(
-        "🔍", "Legal Issue Spotter",
-        "Automatically identify potential legal issues, ambiguities, and drafting problems in any document.",
-        ["Upload or paste any legal document", "Receive categorised list of legal issues",
-         "See severity rating for each issue", "Get suggested remedies for each issue",
-         "Export issues report for client advice"],
-        ["Issue register (category, severity, clause reference)", "Suggested remedies",
-         "Risk score per issue", "Issues report (Word/PDF)"],
-    )
+    st.markdown("Automatically identify and categorise all legal issues, ambiguities, and drafting problems in any document.")
+    text5 = document_input_ui("is", paste_placeholder="Paste any legal document, contract, or submission here…")
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    is_doc_type = c1.selectbox("Document Type", [
+        "Contract", "Court pleading", "Legislation / Policy", "Legal letter",
+        "Shareholder agreement", "Employment document", "Property document", "Other",
+    ], key="is_dt")
+    is_jur = c2.text_input("Jurisdiction", placeholder="e.g. UK, Rwandan law", key="is_jur")
+    is_persp = c3.selectbox("Perspective", [
+        "Neutral review", "Claimant / Buyer", "Defendant / Seller",
+        "Employer", "Employee", "Lender", "Borrower",
+    ], key="is_persp")
+    if st.button("🔍 Spot Legal Issues", type="primary", disabled=not api_key, key="is_btn"):
+        if not text5:
+            st.warning("⚠️ Upload or paste a document first.")
+        else:
+            from utils.issue_spotter import IssueSpotter
+            with st.spinner("Analysing with Claude Opus 4.7…"):
+                try:
+                    result5 = IssueSpotter(api_key).spot(text5, is_doc_type, is_jur, is_persp)
+                    st.session_state.is_result = result5
+                    st.success("✅ Analysis complete!")
+                except Exception as exc:
+                    st.error(f"Analysis failed: {exc}")
+    if st.session_state.get("is_result"):
+        result5 = st.session_state.is_result
+        issues = result5.get("issues", [])
+        st.divider()
+        risk_color = {"critical": "#dc2626", "high": "#d97706", "medium": "#2563eb", "low": "#16a34a"}
+        m1, m2, m3, m4 = st.columns(4)
+        m1.markdown(f'<div class="metric-card"><div class="val">{len(issues)}</div><div class="lbl">Issues Found</div></div>', unsafe_allow_html=True)
+        critical = len([i for i in issues if i.get("severity") == "critical"])
+        high = len([i for i in issues if i.get("severity") == "high"])
+        m2.markdown(f'<div class="metric-card"><div class="val" style="color:#dc2626">{critical}</div><div class="lbl">Critical</div></div>', unsafe_allow_html=True)
+        m3.markdown(f'<div class="metric-card"><div class="val" style="color:#d97706">{high}</div><div class="lbl">High</div></div>', unsafe_allow_html=True)
+        m4.markdown(f'<div class="metric-card"><div class="val">{result5.get("risk_level","—").title()}</div><div class="lbl">Overall Risk</div></div>', unsafe_allow_html=True)
+        st.markdown(f"**Assessment:** {result5.get('summary','')}")
+        if result5.get("priority_actions"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            section("🚨 Priority Actions")
+            for a in result5["priority_actions"]: st.error(f"→ {a}")
+        if issues:
+            st.markdown("<br>", unsafe_allow_html=True)
+            section(f"📋 Issues Register ({len(issues)})")
+            hdr = st.columns([1.5, 1.5, 3, 3, 1])
+            for col, lbl in zip(hdr, ["Category", "Clause", "Issue", "Remedy", "Severity"]):
+                col.markdown(f"**{lbl}**")
+            st.divider()
+            for issue in issues:
+                sev = issue.get("severity", "medium").lower()
+                row = st.columns([1.5, 1.5, 3, 3, 1])
+                row[0].markdown(issue.get("category", ""))
+                row[1].markdown(f'<span style="color:#64748b;font-size:0.85rem">{issue.get("clause_reference","N/A")}</span>', unsafe_allow_html=True)
+                row[2].markdown(issue.get("description", ""))
+                row[3].markdown(issue.get("remedy", ""))
+                row[4].markdown(risk_badge(sev), unsafe_allow_html=True)
+                st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, _, c3 = st.columns(3)
+        with c1: download_json("📥 Download Issues Report (.json)", result5, "legal_issues.json", key="is_dl")
+        with c3:
+            if st.button("🔄 Reset", key="is_rst", use_container_width=True):
+                st.session_state.pop("is_result", None); st.rerun()

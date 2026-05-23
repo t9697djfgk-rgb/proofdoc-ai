@@ -122,27 +122,133 @@ with tab2:
             if st.button("🔄 Reset", key="dca_rst", use_container_width=True):
                 st.session_state.pop("dca_result", None); st.rerun()
 
-# ── 3. Contract Summary (placeholder) ────────────────────────────
+# ── 3. Contract Summary ───────────────────────────────────────────
 with tab3:
-    placeholder_feature(
-        "📋", "Contract Summary",
-        "Generate a concise plain-English summary of any contract, highlighting key commercial terms.",
-        ["Upload any contract in PDF or Word format", "Receive structured summary with key terms table",
-         "Identify parties, dates, payment, termination, and key obligations",
-         "Export one-page summary for client or internal use"],
-        ["One-page contract summary", "Key terms table (parties, value, term, governing law)",
-         "Risk flags highlighted", "Word/PDF export"],
-    )
+    st.markdown("Generate a structured plain-English summary of any contract — parties, key terms, obligations, and risk flags.")
+    text3 = document_input_ui("cs", paste_placeholder="Paste the contract text here…")
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    cs_type = c1.selectbox("Contract Type", [
+        "Service agreement", "NDA", "Employment contract", "SPA",
+        "Shareholder agreement", "Loan agreement", "Lease", "Other",
+    ], key="cs_ct")
+    cs_persp = c2.selectbox("Client Perspective", [
+        "Neutral", "Buyer / Investor", "Seller / Target",
+        "Service Provider", "Client / Customer", "Employer", "Employee",
+    ], key="cs_persp")
+    if st.button("📋 Summarise Contract", type="primary", disabled=not api_key, key="cs_btn"):
+        if not text3:
+            st.warning("⚠️ Upload or paste a contract first.")
+        else:
+            from utils.contract_summary import ContractSummarizer
+            with st.spinner("Summarising with Claude Opus 4.7…"):
+                try:
+                    result3 = ContractSummarizer(api_key).summarize(text3, cs_type, cs_persp)
+                    st.session_state.cs_result = result3
+                    st.success("✅ Summary complete!")
+                except Exception as exc:
+                    st.error(f"Summarisation failed: {exc}")
+    if st.session_state.get("cs_result"):
+        result3 = st.session_state.cs_result
+        st.divider()
+        st.markdown(f"**Executive Summary:** {result3.get('executive_summary','')}")
+        st.markdown(f"**Client Advice:** {result3.get('client_advice','')}")
+        cs_tabs = st.tabs(["📋 Key Terms", "👥 Parties", "⚖️ Obligations", "🔑 Rights", "⚠️ Risk Flags", "❌ Missing Clauses"])
+        with cs_tabs[0]:
+            kt = result3.get("key_terms", {})
+            for k, v in kt.items():
+                if v:
+                    st.markdown(f"**{k.replace('_',' ').title()}:** {v}")
+        with cs_tabs[1]:
+            for p in result3.get("parties", []):
+                st.markdown(f"- **{p.get('name','')}** — {p.get('role','')}")
+        with cs_tabs[2]:
+            for ob in result3.get("key_obligations", []):
+                st.markdown(f"- **{ob.get('party','')}**: {ob.get('obligation','')} _{ob.get('deadline','')}_")
+        with cs_tabs[3]:
+            for r in result3.get("key_rights", []): st.markdown(f"- {r}")
+        with cs_tabs[4]:
+            for rf in result3.get("risk_flags", []):
+                fn = st.error if rf.get("severity") == "high" else st.warning
+                fn(f"**{rf.get('issue','')}** — {rf.get('recommendation','')}")
+        with cs_tabs[5]:
+            for m in result3.get("missing_standard_clauses", []): st.warning(m)
+            if not result3.get("missing_standard_clauses"):
+                st.success("No missing standard clauses identified.")
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, _, c3 = st.columns(3)
+        with c1: download_json("📥 Download Summary (.json)", result3, "contract_summary.json", key="cs_dl")
+        with c3:
+            if st.button("🔄 Reset", key="cs_rst", use_container_width=True):
+                st.session_state.pop("cs_result", None); st.rerun()
 
-# ── 4. Risk Report Generator (placeholder) ───────────────────────
+# ── 4. Risk Report Generator ──────────────────────────────────────
 with tab4:
-    placeholder_feature(
-        "🚨", "Risk Report Generator",
-        "Generate a comprehensive risk report across multiple documents for board or client reporting.",
-        ["Upload multiple documents for batch risk analysis",
-         "Receive consolidated risk register across all documents",
-         "Prioritise risks by severity and likelihood",
-         "Export board-ready risk report"],
-        ["Consolidated risk register", "Risk matrix (severity × likelihood)",
-         "Board-ready risk report (PDF)", "Risk summary per document"],
-    )
+    st.markdown("Generate a board-ready risk register and report from any legal document or contract.")
+    text4 = document_input_ui("rr", paste_placeholder="Paste one or more documents (separated by ---) here…")
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    rr_type = c1.selectbox("Document Type", [
+        "Contract / Agreement", "Corporate documents", "Litigation bundle",
+        "Due diligence report", "Regulatory filing", "Other",
+    ], key="rr_dt")
+    rr_audience = c2.selectbox("Reporting Audience", [
+        "Board / Senior management", "Client briefing", "Legal team internal",
+        "Investor / Lender", "Regulatory body",
+    ], key="rr_aud")
+    rr_jur = c3.text_input("Jurisdiction", placeholder="e.g. UK, Rwanda", key="rr_jur")
+    if st.button("🚨 Generate Risk Report", type="primary", disabled=not api_key, key="rr_btn"):
+        if not text4:
+            st.warning("⚠️ Upload or paste a document first.")
+        else:
+            from utils.contract_summary import RiskReportGenerator
+            with st.spinner("Generating with Claude Opus 4.7…"):
+                try:
+                    result4 = RiskReportGenerator(api_key).generate(text4, rr_type, rr_audience, rr_jur)
+                    st.session_state.rr_result = result4
+                    st.success("✅ Risk report ready!")
+                except Exception as exc:
+                    st.error(f"Generation failed: {exc}")
+    if st.session_state.get("rr_result"):
+        result4 = st.session_state.rr_result
+        register = result4.get("risk_register", [])
+        st.divider()
+        ov_col = {"Critical": "#dc2626", "High": "#d97706", "Medium": "#2563eb", "Low": "#16a34a"}.get(result4.get("overall_risk_rating",""), "#64748b")
+        m1, m2, m3 = st.columns(3)
+        m1.markdown(f'<div class="metric-card"><div class="val" style="color:{ov_col}">{result4.get("overall_risk_rating","—")}</div><div class="lbl">Overall Risk</div></div>', unsafe_allow_html=True)
+        m2.markdown(f'<div class="metric-card"><div class="val">{len(register)}</div><div class="lbl">Risks Identified</div></div>', unsafe_allow_html=True)
+        immediate = len([r for r in register if r.get("priority") == "Immediate"])
+        m3.markdown(f'<div class="metric-card"><div class="val" style="color:#dc2626">{immediate}</div><div class="lbl">Immediate Actions</div></div>', unsafe_allow_html=True)
+        st.markdown(f"**Executive Summary:** {result4.get('executive_summary','')}")
+        if result4.get("immediate_actions"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            section("🚨 Immediate Actions Required")
+            for a in result4["immediate_actions"]: st.error(f"→ {a}")
+        if register:
+            st.markdown("<br>", unsafe_allow_html=True)
+            section(f"📋 Risk Register ({len(register)} risks)")
+            hdr = st.columns([0.8, 1.5, 2.5, 1, 1, 2.5, 1.5])
+            for col, lbl in zip(hdr, ["ID", "Category", "Risk", "Likelihood", "Impact", "Action", "Priority"]):
+                col.markdown(f"**{lbl}**")
+            st.divider()
+            for r in register:
+                row = st.columns([0.8, 1.5, 2.5, 1, 1, 2.5, 1.5])
+                row[0].text(r.get("risk_id",""))
+                row[1].text(r.get("category",""))
+                row[2].markdown(r.get("description",""))
+                row[3].markdown(risk_badge(r.get("likelihood","medium").lower()), unsafe_allow_html=True)
+                row[4].markdown(risk_badge(r.get("impact","medium").lower()), unsafe_allow_html=True)
+                row[5].markdown(r.get("recommended_action",""))
+                row[6].text(r.get("priority",""))
+                st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+        if result4.get("compliance_gaps"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            section("⚠️ Compliance Gaps")
+            for g in result4["compliance_gaps"]: st.warning(g)
+        st.markdown(f"\n**Conclusion:** {result4.get('conclusion','')}")
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, _, c3 = st.columns(3)
+        with c1: download_json("📥 Download Risk Report (.json)", result4, "risk_report.json", key="rr_dl")
+        with c3:
+            if st.button("🔄 Reset", key="rr_rst", use_container_width=True):
+                st.session_state.pop("rr_result", None); st.rerun()

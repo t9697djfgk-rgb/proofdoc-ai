@@ -250,25 +250,137 @@ with tab4:
         action_row(text_to_download=policy_doc, base_filename="compliance_policy",
                    report_data=result_cp, reset_keys=["cp_result"], key_prefix="cp")
 
-# ── 5. Court Document Drafting (placeholder) ─────────────────────
+# ── 5. Court Document Drafting ────────────────────────────────────
 with tab5:
-    placeholder_feature(
-        "🏛️", "Court Document Drafting",
-        "Generate court-ready pleadings, motions, submissions, and applications from your facts.",
-        ["Select document type (claim, defence, motion, etc.)", "Enter parties and facts",
-         "AI drafts in correct court format", "Review and customise before filing"],
-        ["Court document draft in correct jurisdiction format",
-         "Checklist of required attachments", "Filing instructions"],
+    st.markdown(
+        '<div class="notice-box">ℹ️ Drafts are first versions only — always review before filing. '
+        "Ensure you comply with the court's specific format rules.</div>",
+        unsafe_allow_html=True,
     )
+    c1, c2, c3 = st.columns(3)
+    cdd_doc_type = c1.selectbox("Document Type", [
+        "Statement of Claim / Particulars of Claim",
+        "Defence",
+        "Reply to Defence",
+        "Counter-claim",
+        "Skeleton Argument",
+        "Written Submissions",
+        "Affidavit",
+        "Witness Statement",
+        "Motion / Application",
+        "Appeal Brief",
+        "Demand Letter",
+        "Other",
+    ], key="cdd_dt")
+    cdd_court = c2.text_input("Court / Tribunal", placeholder="e.g. High Court, Commercial Court", key="cdd_court")
+    cdd_jur   = c3.selectbox("Jurisdiction", ["England & Wales", "Scotland", "Rwanda",
+                                               "United States", "International / Other"], key="cdd_jur")
+    c4, c5 = st.columns(2)
+    cdd_claimant  = c4.text_input("Claimant / Applicant", placeholder="Full legal name", key="cdd_cl")
+    cdd_defendant = c5.text_input("Defendant / Respondent", placeholder="Full legal name", key="cdd_def")
+    cdd_facts  = st.text_area("Key Facts *", height=120,
+                               placeholder="Set out the material facts, events, dates, and what occurred…", key="cdd_facts")
+    cdd_relief = st.text_area("Relief / Remedy Sought", height=60,
+                               placeholder="e.g. damages of £X, injunction, declaration, costs…", key="cdd_relief")
+    cdd_add    = st.text_area("Additional Instructions", height=60,
+                               placeholder="Specific legal points, authorities to rely on, format preferences…", key="cdd_add")
+    if st.button("🏛️ Draft Court Document", type="primary", disabled=not api_key, key="cdd_btn"):
+        if not cdd_facts.strip():
+            st.warning("⚠️ Key facts are required.")
+        else:
+            from utils.drafting_assistant import DraftingAssistant
+            with st.spinner("Drafting with Claude Opus 4.7…"):
+                try:
+                    instructions = (
+                        f"COURT DOCUMENT TYPE: {cdd_doc_type}\n"
+                        f"Court: {cdd_court}\nJurisdiction: {cdd_jur}\n"
+                        f"Claimant: {cdd_claimant}\nDefendant: {cdd_defendant}\n"
+                        f"Relief sought: {cdd_relief}\n"
+                        f"Additional: {cdd_add}\n\n"
+                        "Draft in proper court document format with numbered paragraphs, "
+                        "clear section headings, and formal legal language suitable for filing."
+                    )
+                    result5 = DraftingAssistant(api_key).draft(
+                        cdd_doc_type, cdd_jur, "Formal litigation", f"{cdd_claimant} v {cdd_defendant}",
+                        cdd_facts, "Formal", instructions)
+                    st.session_state.cdd_result = result5
+                    st.success("✅ Draft ready!")
+                except Exception as exc:
+                    st.error(f"Drafting failed: {exc}")
+    if st.session_state.get("cdd_result"):
+        result5 = st.session_state.cdd_result
+        draft_doc = result5.get("draft_document", "")
+        st.divider()
+        section("📄 Court Document Draft")
+        st.markdown(
+            f'<div class="revised-doc">{draft_doc.replace(chr(10),"<br>")}</div>',
+            unsafe_allow_html=True,
+        )
+        if result5.get("drafting_notes"):
+            section("📝 Drafting Notes")
+            for note in result5["drafting_notes"]: st.info(note)
+        st.markdown("<br>", unsafe_allow_html=True)
+        action_row(text_to_download=draft_doc, base_filename="court_document",
+                   report_data=result5, reset_keys=["cdd_result"], key_prefix="cdd")
 
-# ── 6. Template Builder (placeholder) ────────────────────────────
+# ── 6. Template Builder ───────────────────────────────────────────
 with tab6:
-    placeholder_feature(
-        "🔧", "Template Builder",
-        "Create reusable document templates with smart fields, auto-fill variables, and approval workflows.",
-        ["Build templates from scratch or from existing documents",
-         "Add smart fields (party names, dates, amounts)", "Set required and optional fields",
-         "Share templates with team and set access permissions"],
-        ["Saved template with smart fields", "Filled document from template",
-         "Template library for the firm"],
-    )
+    from utils.shared.styles import group_header as _gh
+    _gh("Template Builder")
+    st.markdown("Build a reusable document template by filling in the fields below. The template is saved to your session.")
+
+    if "templates" not in st.session_state:
+        st.session_state.templates = []
+
+    t_tab_view, t_tab_create = st.tabs(["📚 My Templates", "➕ Create Template"])
+
+    with t_tab_create:
+        with st.form("new_template", clear_on_submit=True):
+            tm_name = st.text_input("Template Name *", placeholder="e.g. NDA Template — UK Law")
+            tm_cat  = st.selectbox("Category", [
+                "Contract", "Court Document", "Legal Letter",
+                "Policy", "Memo", "Agreement", "Other",
+            ])
+            tm_jur  = st.selectbox("Jurisdiction", ["UK", "US", "EU", "Rwanda", "International", "Other"])
+            tm_body = st.text_area("Template Text *", height=250,
+                                   placeholder="Write your template. Use {{PARTY_NAME}}, {{DATE}}, {{AMOUNT}} etc. as placeholders…")
+            tm_notes = st.text_area("Usage Notes", height=60)
+            if st.form_submit_button("💾 Save Template"):
+                if tm_name.strip() and tm_body.strip():
+                    st.session_state.templates.append({
+                        "name": tm_name, "category": tm_cat, "jurisdiction": tm_jur,
+                        "body": tm_body, "notes": tm_notes,
+                    })
+                    st.success(f"✅ Template '{tm_name}' saved to session.")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Name and template text are required.")
+
+    with t_tab_view:
+        templates = st.session_state.templates
+        if not templates:
+            st.markdown('<div class="empty-list">No templates yet. Create one in the tab above.</div>', unsafe_allow_html=True)
+        else:
+            for i, tmpl in enumerate(templates):
+                with st.expander(f"**{tmpl['name']}** · {tmpl['category']} · {tmpl['jurisdiction']}"):
+                    st.text_area("Template", value=tmpl["body"], height=150, key=f"tmpl_view_{i}", disabled=True)
+                    if tmpl.get("notes"): st.caption(f"Notes: {tmpl['notes']}")
+                    # Fill form
+                    import re as _re
+                    placeholders = _re.findall(r"\{\{(\w+)\}\}", tmpl["body"])
+                    if placeholders:
+                        st.markdown("**Fill in placeholders:**")
+                        fill_vals = {}
+                        for ph in set(placeholders):
+                            fill_vals[ph] = st.text_input(ph.replace("_", " ").title(), key=f"fill_{i}_{ph}")
+                        if st.button("📄 Generate Document from Template", key=f"gen_{i}"):
+                            filled = tmpl["body"]
+                            for ph, val in fill_vals.items():
+                                if val.strip():
+                                    filled = filled.replace(f"{{{{{ph}}}}}", val.strip())
+                            st.text_area("Filled Document", value=filled, height=200, key=f"filled_{i}")
+                            st.download_button("📥 Download (.txt)", filled, f"{tmpl['name']}.txt",
+                                               "text/plain", key=f"dl_tmpl_{i}")
+                    if st.button("🗑️ Delete Template", key=f"del_tmpl_{i}"):
+                        st.session_state.templates.pop(i)
+                        st.rerun()
