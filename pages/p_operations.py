@@ -1,6 +1,7 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, group_header, placeholder_feature
+from utils import database as db
 
 setup_page()
 slim_header("📅", "Tasks & Calendar", "Manage tasks, deadlines, workflow templates, and firm calendar")
@@ -10,29 +11,60 @@ tab_tasks, tab_calendar, tab_workflow = st.tabs([
 ])
 
 with tab_tasks:
-    group_header("Task Management")
-    c_left, c_right = st.columns([3, 1])
-    c_left.markdown("### My Tasks")
-    if c_right.button("+ New Task", type="primary", use_container_width=True):
-        st.info("Task creation requires a database — coming soon.")
-    st.markdown(
-        '<div class="empty-list" style="margin-top:1rem">'
-        '✅ No tasks yet.<br>'
-        '<small>Create tasks linked to matters and set due dates.</small>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown("<br>", unsafe_allow_html=True)
-    placeholder_feature(
-        "✅", "Task Management",
-        "Create, assign, and track tasks linked to matters and documents.",
-        ["Create tasks with due dates, priority, and assignee",
-         "Link tasks to specific matters or documents",
-         "Set recurring tasks and workflow reminders",
-         "Track team task completion and workload"],
-        ["Task list per matter", "Team workload view", "Overdue tasks alert",
-         "Weekly task report"],
-    )
+    group_header("All Tasks")
+
+    # Filters
+    fc1, fc2, fc3, _ = st.columns([1, 1, 1, 1])
+    f_status   = fc1.selectbox("Status",   ["All", "Pending", "In Progress", "Done"], key="t_status")
+    f_priority = fc2.selectbox("Priority", ["All", "High", "Medium", "Low"],          key="t_priority")
+
+    all_tasks = db.list_tasks(status="" if f_status == "All" else f_status)
+    if f_priority != "All":
+        all_tasks = [t for t in all_tasks if t["priority"] == f_priority]
+
+    # Quick-add task (no matter)
+    with st.expander("＋ Add a General Task"):
+        with st.form("ops_new_task", clear_on_submit=True):
+            ot1, ot2, ot3 = st.columns(3)
+            ot_title    = ot1.text_input("Task *")
+            ot_priority = ot2.selectbox("Priority", ["High", "Medium", "Low"])
+            ot_due      = ot3.text_input("Due (YYYY-MM-DD)")
+            ot_assign   = st.text_input("Assigned to")
+            if st.form_submit_button("＋ Add Task"):
+                if ot_title.strip():
+                    db.create_task("", ot_title.strip(), priority=ot_priority,
+                                   due_date=ot_due.strip(), assigned_to=ot_assign.strip())
+                    st.rerun()
+
+    if not all_tasks:
+        st.markdown(
+            '<div class="empty-list" style="margin-top:1rem">'
+            '✅ No tasks yet.<br>'
+            '<small>Add tasks here or inside any matter.</small>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        h = st.columns([3, 1, 1.5, 1.5, 0.8])
+        for col, lbl in zip(h, ["Title", "Priority", "Due Date", "Status", ""]):
+            col.markdown(f"**{lbl}**")
+        st.divider()
+        for t in all_tasks:
+            row = st.columns([3, 1, 1.5, 1.5, 0.8])
+            row[0].text(t["title"])
+            pri_badge = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(t["priority"], "⚪")
+            row[1].text(f"{pri_badge} {t['priority']}")
+            row[2].text(t["due_date"] or "—")
+            new_s = row[3].selectbox("", ["Pending", "In Progress", "Done"],
+                                     index=["Pending","In Progress","Done"].index(t["status"]),
+                                     key=f"ops_ts_{t['id']}", label_visibility="collapsed")
+            if new_s != t["status"]:
+                db.update_task(t["id"], status=new_s)
+                st.rerun()
+            if row[4].button("🗑️", key=f"ops_del_{t['id']}"):
+                db.delete_task(t["id"])
+                st.rerun()
+        st.caption(f"{len(all_tasks)} tasks")
 
 with tab_calendar:
     placeholder_feature(

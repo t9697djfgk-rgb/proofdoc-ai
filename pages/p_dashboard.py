@@ -1,6 +1,7 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import stat_strip, group_header
+from utils import database as db
 
 api_key = setup_page()
 
@@ -22,11 +23,12 @@ ai_count = sum(
     1 for k in st.session_state
     if k.endswith("_result") and st.session_state[k]
 )
+stats = db.dashboard_stats()
 s1, s2, s3, s4 = st.columns(4)
-s1.markdown(stat_strip("—", "Active Matters", "Coming soon"), unsafe_allow_html=True)
+s1.markdown(stat_strip(str(stats["active_matters"]), "Active Matters", f"{stats['total_clients']} clients"), unsafe_allow_html=True)
 s2.markdown(stat_strip(str(len(audit)), "Docs Processed", "This session"), unsafe_allow_html=True)
 s3.markdown(stat_strip(str(ai_count), "AI Reviews Run", "This session"), unsafe_allow_html=True)
-s4.markdown(stat_strip("—", "Tasks Due Today", "Coming soon"), unsafe_allow_html=True)
+s4.markdown(stat_strip(str(stats["pending_tasks"]), "Pending Tasks", f"{stats['upcoming_deadlines']} deadlines in 14 days"), unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -64,11 +66,23 @@ col_m, col_d, col_ai = st.columns(3)
 
 with col_m:
     st.markdown("**📁 Recent Matters**")
-    st.markdown(
-        '<div class="empty-list">No active matters yet.<br>'
-        '<small>Open a matter to get started.</small></div>',
-        unsafe_allow_html=True,
-    )
+    recent_matters = stats.get("recent_matters", [])
+    if recent_matters:
+        for m in recent_matters:
+            badge = {"Active": "🟢", "Closed": "🔴", "On Hold": "🟡"}.get(m["status"], "⚪")
+            st.markdown(
+                f'<div class="activity-item">'
+                f'<div class="ai-title">{badge} {m["ref"]}: {m["title"][:35]}</div>'
+                f'<div class="ai-meta">Opened {m["opened_date"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.markdown(
+            '<div class="empty-list">No active matters yet.<br>'
+            '<small>Open a matter to get started.</small></div>',
+            unsafe_allow_html=True,
+        )
     st.page_link("pages/p_matters_list.py", label="+ New Matter")
 
 with col_d:
@@ -150,13 +164,24 @@ with col_dl:
     st.page_link("pages/p_ai_review.py", label="Extract Deadlines →")
 
 with col_tk:
-    st.markdown("**✅ Tasks Due Today**")
-    st.markdown(
-        '<div class="empty-list">Task management coming soon.<br>'
-        '<small>Assign tasks to matters and track progress.</small></div>',
-        unsafe_allow_html=True,
-    )
-    st.page_link("pages/p_operations.py", label="Go to Tasks →")
+    st.markdown("**✅ Overdue & Due-Soon Tasks**")
+    overdue = stats.get("overdue_tasks", [])
+    if overdue:
+        for t in overdue:
+            st.markdown(
+                f'<div class="activity-item">'
+                f'<div class="ai-title">⚠️ {t["title"][:40]}</div>'
+                f'<div class="ai-meta">Due: {t["due_date"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.markdown(
+            '<div class="empty-list">No overdue tasks.<br>'
+            '<small>Add tasks inside any matter.</small></div>',
+            unsafe_allow_html=True,
+        )
+    st.page_link("pages/p_matters_list.py", label="Go to Matters →")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
