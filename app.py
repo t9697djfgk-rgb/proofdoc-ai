@@ -34,7 +34,7 @@ st.markdown(
     <div class="main-header">
         <h1>⚖️ ProofDoc AI — Legal Grade</h1>
         <p>AI-powered document reconstruction · Confidence scoring · Legal formatting preservation</p>
-        <small>🔐 Confidentiality-first · Files auto-deleted after session · Powered by Claude Opus 4.7</small>
+        <small>🔐 Confidentiality-first · Files auto-deleted after session · Powered by Gemini 2.0 Flash</small>
     </div>
     """,
     unsafe_allow_html=True,
@@ -46,16 +46,16 @@ with st.sidebar:
 
     api_key = None
     try:
-        api_key = st.secrets["ANTHROPIC_API_KEY"]
+        api_key = st.secrets["GOOGLE_API_KEY"]
         st.success("✅ API key loaded from secrets")
     except Exception:
         api_key = st.text_input(
-            "Anthropic API Key", type="password", placeholder="sk-ant-..."
+            "Google API Key", type="password", placeholder="AIza..."
         )
         if api_key:
             st.success("✅ API key set")
         else:
-            st.warning("Enter your Anthropic API key to begin")
+            st.warning("Enter your Google API key to begin")
 
     st.divider()
 
@@ -71,7 +71,7 @@ with st.sidebar:
             "letter",
             "general",
         ],
-        help="Helps Claude understand the document context for better extraction",
+        help="Helps Gemini understand the document context for better extraction",
     )
 
     st.divider()
@@ -124,7 +124,7 @@ with tab1:
                 f.write(uploaded_file.getbuffer())
             conf_mgr.log_action("UPLOAD", uploaded_file.name)
 
-            progress = st.progress(0, text="Initialising Claude Opus 4.7…")
+            progress = st.progress(0, text="Initialising Gemini 2.0 Flash…")
 
             processor = ClaudeDocumentProcessor(api_key)
             pages_hint = "(multi-page — may take a moment)" if uploaded_file.name.lower().endswith(".pdf") else ""

@@ -1,5 +1,4 @@
-import anthropic
-import base64
+import google.generativeai as genai
 import json
 import re
 import io
@@ -15,15 +14,11 @@ no explanation text outside the JSON object."""
 
 class ClaudeDocumentProcessor:
     def __init__(self, api_key: str):
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.model = "claude-opus-4-7"
-
-    def _image_to_base64(self, image: Image.Image) -> str:
-        if image.mode in ("RGBA", "LA", "P"):
-            image = image.convert("RGB")
-        buffer = io.BytesIO()
-        image.save(buffer, format="JPEG", quality=95)
-        return base64.standard_b64encode(buffer.getvalue()).decode()
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(
+            model_name="gemini-2.0-flash",
+            system_instruction=SYSTEM_PROMPT,
+        )
 
     def _extract_images(self, file_path: str) -> list:
         ext = file_path.lower().rsplit(".", 1)[-1]
@@ -40,7 +35,8 @@ class ClaudeDocumentProcessor:
     def _analyze_page(
         self, image: Image.Image, page_num: int, total_pages: int, doc_type: str
     ) -> dict:
-        img_b64 = self._image_to_base64(image)
+        if image.mode in ("RGBA", "LA", "P"):
+            image = image.convert("RGB")
 
         prompt = f"""Analyze page {page_num} of {total_pages} of this {doc_type} document.
 Extract ALL content precisely and return ONLY this JSON (no other text):
@@ -84,38 +80,10 @@ Extract ALL content precisely and return ONLY this JSON (no other text):
   "warnings": []
 }}"""
 
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=6144,
-            system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": img_b64,
-                            },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-        )
-
-        text = next((b.text for b in response.content if b.type == "text"), "{}")
+        response = self.model.generate_content([image, prompt])
+        text = response.text.strip() if response.text else "{}"
 
         try:
-            text = text.strip()
             if text.startswith("```"):
                 text = re.sub(r"^```(?:json)?\s*", "", text)
                 text = re.sub(r"\s*```$", "", text)
