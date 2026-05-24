@@ -2,7 +2,7 @@ import streamlit as st
 from utils.shared.sidebar import setup_page, get_law_context_block
 from utils.shared.styles import slim_header, disclaimer, section, risk_badge
 from utils.shared.document_input import document_input_ui, two_document_input_ui
-from utils.shared.export_utils import download_json
+from utils.shared.export_utils import download_json, download_docx_from_dict
 
 from utils.auth import require_lawyer
 api_key = setup_page("Analysis")
@@ -95,8 +95,10 @@ with tab1:
                 )
         for m in mat: st.warning(m)
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3)
         with c1: download_json("📥 Download DD Report (.json)", result1, "due_diligence.json", key="dda_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", result1, "due_diligence_review.docx",
+                                          title="Due Diligence Review", key="dda_dl_docx")
         with c3:
             if st.button("🔄 Reset", key="dda_rst", use_container_width=True):
                 st.session_state.pop("dda_result", None); st.rerun()
@@ -146,8 +148,10 @@ with tab2:
                 row[4].markdown(risk_badge(ch.get("impact_level","low")), unsafe_allow_html=True)
                 st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3)
         with c1: download_json("📥 Download Report (.json)", result2, "comparison.json", key="dca_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", result2, "document_comparison.docx",
+                                          title="Document Comparison Report", key="dca_dl_docx")
         with c3:
             if st.button("🔄 Reset", key="dca_rst", use_container_width=True):
                 st.session_state.pop("dca_result", None); st.rerun()
@@ -206,8 +210,10 @@ with tab3:
             if not result3.get("missing_standard_clauses"):
                 st.success("No missing standard clauses identified.")
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3)
         with c1: download_json("📥 Download Summary (.json)", result3, "contract_summary.json", key="cs_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", result3, "contract_summary.docx",
+                                          title="Contract Summary", key="cs_dl_docx")
         with c3:
             if st.button("🔄 Reset", key="cs_rst", use_container_width=True):
                 st.session_state.pop("cs_result", None); st.rerun()
@@ -277,8 +283,10 @@ with tab4:
             for g in result4["compliance_gaps"]: st.warning(g)
         st.markdown(f"\n**Conclusion:** {result4.get('conclusion','')}")
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3 = st.columns(3)
         with c1: download_json("📥 Download Risk Report (.json)", result4, "risk_report.json", key="rr_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", result4, "risk_report.docx",
+                                          title="Risk Report", key="rr_dl_docx")
         with c3:
             if st.button("🔄 Reset", key="rr_rst", use_container_width=True):
                 st.session_state.pop("rr_result", None); st.rerun()

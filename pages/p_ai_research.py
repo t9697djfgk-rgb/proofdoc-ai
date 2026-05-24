@@ -1,7 +1,7 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page, get_law_context_block
 from utils.shared.styles import slim_header, group_header, section
-from utils.shared.export_utils import download_json
+from utils.shared.export_utils import download_json, download_docx_from_dict, download_docx
 from utils.auth import require_lawyer
 
 api_key = setup_page("Research")
@@ -69,8 +69,10 @@ with tab_research:
                 section("⚠️ Areas of Uncertainty")
                 for u in r["areas_of_uncertainty"]: st.warning(u)
             st.info(f"ℹ️ {r.get('disclaimer','AI-generated — verify with primary sources')}")
-            c1, _, c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
             with c1: download_json("📥 Export Research (.json)", r, "legal_research.json", key="lr_dl")
+            with c2: download_docx_from_dict("📝 Download (.docx)", r, "legal_research.docx",
+                                              title="Legal Research Memo", key="lr_dl_docx")
             with c3:
                 if st.button("🔄 Reset", key="lr_rst", use_container_width=True):
                     st.session_state.pop("lr_result", None); st.rerun()
@@ -118,8 +120,10 @@ with tab_research:
                 section("⚖️ Key Principles")
                 for p in r["key_principles"]: st.markdown(f"- {p}")
             st.markdown(f"**Significance:** {r.get('significance','')}")
-            c1, _, c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
             with c1: download_json("📥 Export Summary (.json)", r, "case_summary.json", key="csum_dl")
+            with c2: download_docx_from_dict("📝 Download (.docx)", r, "case_summary.docx",
+                                              title="Case Summary", key="csum_dl_docx")
             with c3:
                 if st.button("🔄 Reset", key="csum_rst", use_container_width=True):
                     st.session_state.pop("csum_result", None); st.rerun()
@@ -172,8 +176,10 @@ with tab_research:
                 for faq in r["faqs"]:
                     with st.expander(faq.get("question","")):
                         st.markdown(faq.get("answer",""))
-            c1, _, c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
             with c1: download_json("📥 Export Explanation (.json)", r, "statute_explanation.json", key="se_dl")
+            with c2: download_docx_from_dict("📝 Download (.docx)", r, "statute_explanation.docx",
+                                              title="Statute Explanation", key="se_dl_docx")
             with c3:
                 if st.button("🔄 Reset", key="se_rst", use_container_width=True):
                     st.session_state.pop("se_result", None); st.rerun()
@@ -214,8 +220,10 @@ with tab_research:
                 section("🌍 Jurisdiction Variations")
                 for v in r["jurisdiction_variations"]:
                     st.markdown(f"**{v.get('jurisdiction','')}:** _{v.get('equivalent_term','')}_  — {v.get('difference','')}")
-            c1, _, c3 = st.columns(3)
+            c1, c2, c3 = st.columns(3)
             with c1: download_json("📥 Export (.json)", r, "legal_term.json", key="tc_dl")
+            with c2: download_docx_from_dict("📝 Download (.docx)", r, "legal_term_clarification.docx",
+                                              title="Legal Term Clarification", key="tc_dl_docx")
             with c3:
                 if st.button("🔄 Reset", key="tc_rst", use_container_width=True):
                     st.session_state.pop("tc_result", None); st.rerun()
@@ -267,13 +275,17 @@ with tab_translation:
                 section("⚠️ Untranslatable Terms")
                 for t in r["untranslatable_terms"]:
                     st.warning(f"**{t.get('term','')}**: {t.get('explanation','')} (Closest: _{t.get('closest_equivalent','')}_)")
-            c1b = st.columns(3)[0]
-            with c1b:
+            _lt_c1, _lt_c2, _lt_c3 = st.columns(3)
+            with _lt_c1:
                 st.download_button("📥 Download Translation (.txt)",
                     r.get("translated_text",""), "translation.txt", "text/plain",
                     use_container_width=True, key="lt_dl")
-            if st.button("🔄 Reset", key="lt_rst"):
-                st.session_state.pop("lt_result", None); st.rerun()
+            with _lt_c2:
+                download_docx("📝 Download (.docx)", r.get("translated_text",""),
+                              "translation.docx", title="Legal Translation", key="lt_dl_docx")
+            with _lt_c3:
+                if st.button("🔄 Reset", key="lt_rst", use_container_width=True):
+                    st.session_state.pop("lt_result", None); st.rerun()
 
     with t_tab2:
         st.markdown("Compare an original legal document with its translation to detect meaning discrepancies.")

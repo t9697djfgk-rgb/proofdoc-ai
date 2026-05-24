@@ -302,18 +302,27 @@ with tab_invoices:
             </div>""",
             unsafe_allow_html=True,
         )
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5 = st.columns(5)
         c1.download_button(
-            "⬇️ Download (.txt)", st.session_state.inv_preview,
+            "⬇️ .txt", st.session_state.inv_preview,
             "invoice.txt", "text/plain", use_container_width=True, key="inv_dl",
         )
         with c2:
+            from utils.shared.export_utils import download_docx as _inv_docx
+            _inv_inv_data = st.session_state.get("inv_data", {})
+            _inv_docx(
+                "📝 .docx", st.session_state.inv_preview,
+                "invoice.docx",
+                title=f"Invoice {_inv_inv_data.get('ref','')}",
+                key="inv_dl_docx",
+            )
+        with c3:
             from utils.shared.export_utils import download_pdf
             download_pdf(
-                "📄 Download (.pdf)", st.session_state.inv_preview,
+                "📄 .pdf", st.session_state.inv_preview,
                 "invoice.pdf", title="Invoice", key="inv_dl_pdf",
             )
-        if c3.button("✅ Mark as Billed", type="primary", use_container_width=True, key="inv_mark_billed"):
+        if c4.button("✅ Mark as Billed", type="primary", use_container_width=True, key="inv_mark_billed"):
             if selected_mid:
                 n = db.mark_entries_billed(selected_mid)
                 # Save invoice record to DB so client can see it
@@ -339,7 +348,7 @@ with tab_invoices:
                 st.session_state.pop("inv_preview", None)
                 st.session_state.pop("inv_data", None)
                 st.rerun()
-        if c4.button("🗑️ Clear", use_container_width=True, key="inv_clr"):
+        if c5.button("🗑️ Clear", use_container_width=True, key="inv_clr"):
             st.session_state.pop("inv_preview", None)
             st.session_state.pop("inv_data", None)
             st.rerun()

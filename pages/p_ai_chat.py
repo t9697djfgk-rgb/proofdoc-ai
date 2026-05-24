@@ -86,11 +86,18 @@ with st.sidebar:
             f"{'YOU' if m['role'] == 'user' else 'ASSISTANT'}:\n{m['content']}"
             for m in st.session_state.chat_messages
         )
-        st.download_button("📥 Export (.txt)", export_text, "legal_chat.txt",
-                           "text/plain", use_container_width=True, key="chat_dl_txt")
-        from utils.shared.export_utils import download_pdf
-        download_pdf("📄 Export (.pdf)", export_text, "legal_chat.pdf",
-                     title="Legal AI Chat", key="chat_dl_pdf")
+        _chat_c1, _chat_c2, _chat_c3 = st.columns(3)
+        with _chat_c1:
+            st.download_button("📥 Export (.txt)", export_text, "legal_chat.txt",
+                               "text/plain", use_container_width=True, key="chat_dl_txt")
+        with _chat_c2:
+            from utils.shared.export_utils import download_docx
+            download_docx("📝 Export (.docx)", export_text, "legal_chat.docx",
+                          title="Legal AI Chat", key="chat_dl_docx")
+        with _chat_c3:
+            from utils.shared.export_utils import download_pdf
+            download_pdf("📄 Export (.pdf)", export_text, "legal_chat.pdf",
+                         title="Legal AI Chat", key="chat_dl_pdf")
         st.divider()
 
     if st.button("🗑️ Clear conversation", use_container_width=True, key="chat_clear"):

@@ -711,9 +711,16 @@ Full Name: {{WITNESS_NAME}}""",
                                 if val.strip():
                                     filled = filled.replace(f"{{{{{ph}}}}}", val.strip())
                             st.text_area("Filled Document", value=filled, height=200, key=f"filled_{i}")
-                            st.download_button("📥 Download (.txt)", filled,
-                                               f"{tmpl['name']}.txt", "text/plain",
-                                               key=f"dl_tmpl_{i}")
+                            _td1, _td2 = st.columns(2)
+                            _td1.download_button("📥 Download (.txt)", filled,
+                                                  f"{tmpl['name']}.txt", "text/plain",
+                                                  use_container_width=True, key=f"dl_tmpl_{i}")
+                            from utils.shared.export_utils import download_docx as _dl_docx
+                            with _td2:
+                                _dl_docx("📝 Download (.docx)", filled,
+                                         f"{tmpl['name']}.docx",
+                                         title=tmpl.get("name","Document"),
+                                         key=f"dl_tmpl_docx_{i}")
                     if st.button("🗑️ Delete Template", key=f"del_tmpl_{i}"):
                         if _tpl_db_ok:
                             _dbtpl.delete_template(tmpl["id"])

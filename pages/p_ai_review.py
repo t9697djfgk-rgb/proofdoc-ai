@@ -306,9 +306,13 @@ with tab4:
             for dl in deadlines
         )
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, c2, _, c4 = st.columns(4)
+        c1, c2, c3, c4 = st.columns(4)
         with c1: download_txt("📥 Export Deadlines (.txt)", dl_text, "deadlines.txt", key="de_txt")
         with c2: download_json("📊 Export Full Report (.json)", result4, "obligations_report.json", key="de_json")
+        with c3:
+            from utils.shared.export_utils import download_docx_from_dict as _ddfd
+            _ddfd("📝 Download (.docx)", result4, "obligations_report.docx",
+                  title="Obligations & Deadlines Report", key="de_docx")
         with c4:
             if st.button("🔄 Reset", use_container_width=True, key="de_rst"):
                 st.session_state.pop("de_result", None); st.rerun()
