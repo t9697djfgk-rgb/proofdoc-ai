@@ -59,18 +59,20 @@ def download_docx(label: str, text: str, filename: str, key: str | None = None) 
 
 def download_pdf(label: str, text: str, filename: str, title: str = "", key: str | None = None) -> None:
     """Render plain text as a PDF using fpdf2 and offer it as a download."""
-    import io
+    import io, textwrap
     from fpdf import FPDF
 
     def _s(s: str) -> str:
-        """Strip characters outside Latin-1; fpdf2 built-in fonts don't support Unicode/emoji."""
+        # fpdf2 built-in fonts only cover Latin-1; replace anything outside that range
         return s.encode("latin-1", errors="replace").decode("latin-1")
+
+    _title = _s(title)
 
     class _PDF(FPDF):
         def header(self):
-            if title:
+            if _title:
                 self.set_font("Helvetica", "B", 13)
-                self.cell(0, 10, _s(title), align="C", new_x="LMARGIN", new_y="NEXT")
+                self.cell(self.epw, 10, _title, align="C", new_x="LMARGIN", new_y="NEXT")
                 self.ln(2)
 
     pdf = _PDF(orientation="P", unit="mm", format="A4")
@@ -78,19 +80,31 @@ def download_pdf(label: str, text: str, filename: str, title: str = "", key: str
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     pdf.set_font("Helvetica", size=10)
+    w = pdf.epw  # effective width: paper - left margin - right margin (170 mm for A4)
+
     for raw in text.split("\n"):
         line = _s(raw)
         stripped = line.strip()
-        if stripped.startswith("---") or stripped.startswith("==="):
-            pdf.set_draw_color(200, 168, 76)
-            pdf.line(20, pdf.get_y(), 190, pdf.get_y())
-            pdf.ln(3)
-        elif stripped and stripped == stripped.upper() and len(stripped) > 3 and stripped.replace(" ", "").isalpha():
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.multi_cell(0, 6, line)
-            pdf.set_font("Helvetica", size=10)
-        else:
-            pdf.multi_cell(0, 5.5, line if line else " ")
+        # Pre-wrap very long lines so a single token can never exceed the cell width
+        chunks = textwrap.wrap(line, width=120) if len(line) > 120 else [line]
+        for chunk in (chunks or [""]):
+            try:
+                if stripped.startswith("---") or stripped.startswith("==="):
+                    pdf.set_draw_color(200, 168, 76)
+                    pdf.line(pdf.l_margin, pdf.get_y(), pdf.l_margin + w, pdf.get_y())
+                    pdf.ln(3)
+                    break  # only draw the rule once per original line
+                elif (stripped and stripped == stripped.upper()
+                      and len(stripped) > 3
+                      and all(c.isalpha() or c.isspace() for c in stripped)):
+                    pdf.set_font("Helvetica", "B", 10)
+                    pdf.multi_cell(w, 6, chunk)
+                    pdf.set_font("Helvetica", size=10)
+                else:
+                    pdf.multi_cell(w, 5.5, chunk if chunk else " ")
+            except Exception:
+                pdf.ln(5.5)  # skip unrenderable chunk, preserve spacing
+
     buf = io.BytesIO(pdf.output())
     st.download_button(
         label=label,
