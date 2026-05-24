@@ -1,63 +1,117 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, section, risk_badge
+from utils.shared.styles import slim_header, inject_css, section
 from utils.auth import require_auth
 import utils.database as db
+from datetime import date
 
 setup_page()
 user = require_auth()
 if user["role"] != "client":
     st.switch_page("pages/p_lawyer_dashboard.py")
 
-slim_header("🏢", f"Welcome, {user['full_name'].split()[0]}", "Your secure client portal")
+inject_css()
 
-tab_home, tab_matters, tab_docs, tab_disc, tab_invoices, tab_profile = st.tabs([
-    "🏠 Dashboard", "📁 My Matters", "📄 My Documents",
-    "💬 Discussions", "🧾 Invoices", "👤 Profile",
+first_name = user["full_name"].split()[0]
+slim_header("🏢", f"Welcome, {first_name}", f"{user['organization_name']} · Client Portal")
+
+tab_home, tab_matters, tab_docs, tab_disc, tab_profile = st.tabs([
+    "🏠 Overview", "📁 My Matters", "📄 Documents", "💬 Discussions", "👤 Profile",
 ])
 
-# ── Dashboard ─────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# TAB 1 – OVERVIEW
+# ══════════════════════════════════════════════════════════════════
 with tab_home:
     matters   = db.list_matters()
-    notifs    = db.list_notifications(limit=5)
-    unread    = db.unread_notification_count()
+    notifs    = db.list_notifications(limit=6)
+    unread_n  = sum(1 for n in notifs if not n.get("is_read"))
+    active_m  = sum(1 for m in matters if m.get("status") == "Active")
+    all_docs  = db.list_documents()
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("My Matters",       len(matters))
-    m2.metric("Unread Messages",  unread)
-    m3.metric("Active Matters",   sum(1 for m in matters if m.get("status") == "Active"))
+    # KPI cards
+    c1, c2, c3 = st.columns(3)
+    for col, icon, label, value, color, bg in [
+        (c1, "📁", "My Matters",     len(matters),  "#1a2744", "#e8f0fe"),
+        (c2, "⚡", "Active Matters", active_m,      "#059669", "#ecfdf5"),
+        (c3, "🔔", "Notifications",  unread_n,       "#d97706", "#fffbeb"),
+    ]:
+        col.markdown(
+            f"""<div style="background:{bg};border-radius:12px;padding:1rem 1.1rem;
+                            border-left:4px solid {color}">
+              <p style="margin:0;font-size:0.72rem;font-weight:600;color:#6b7280;
+                        text-transform:uppercase">{icon} {label}</p>
+              <p style="margin:0.2rem 0 0;font-size:1.8rem;font-weight:700;color:{color}">{value}</p>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    c_left, c_right = st.columns(2, gap="large")
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+    left, right = st.columns([3, 2], gap="large")
 
-    with c_left:
+    with left:
         section("📁 My Matters")
+        STATUS_CFG = {
+            "Active":   ("#16a34a", "#dcfce7"),
+            "On Hold":  ("#d97706", "#fef9c3"),
+            "Closed":   ("#64748b", "#f1f5f9"),
+        }
         if matters:
             for m in matters:
-                status = m.get("status", "")
-                color = {"Active": "#16a34a", "On Hold": "#d97706"}.get(status, "#64748b")
+                status = m.get("status", "Active")
+                fg, bg = STATUS_CFG.get(status, ("#64748b", "#f1f5f9"))
                 st.markdown(
-                    f"**{m.get('ref','')}** — {m.get('title','')[:45]}<br>"
-                    f"<small style='color:{color}'>{status}</small>",
+                    f"""<div style="background:#fff;border-radius:9px;padding:0.75rem 1rem;
+                                    margin-bottom:0.4rem;border:1px solid rgba(0,0,0,0.07);
+                                    border-left:4px solid {fg}">
+                      <div style="display:flex;align-items:center;gap:0.5rem">
+                        <span style="font-weight:700;color:#1a2744;font-size:0.88rem">
+                          {m.get('ref','')}</span>
+                        <span style="font-size:0.85rem;color:#374151">{m.get('title','')[:45]}</span>
+                        <span style="margin-left:auto;background:{bg};color:{fg};font-size:0.7rem;
+                                     font-weight:600;padding:0.15rem 0.45rem;border-radius:20px">
+                          {status}</span>
+                      </div>
+                      {'<p style="margin:0.2rem 0 0;font-size:0.75rem;color:#9ca3af">'+m.get('matter_type','')+'</p>' if m.get('matter_type') else ''}
+                    </div>""",
                     unsafe_allow_html=True,
                 )
-                st.divider()
         else:
-            st.caption("No matters assigned yet.")
+            st.caption("No matters assigned yet. Your lawyer will add you shortly.")
 
-    with c_right:
-        section("🔔 Recent Notifications")
+    with right:
+        section("🔔 Notifications")
         if notifs:
             for n in notifs:
-                icon = "🔵" if not n.get("is_read") else "⚪"
-                st.markdown(f"{icon} **{n['title']}**")
-                if n.get("body"):
-                    st.caption(n["body"])
-                st.caption(str(n.get("created_at", ""))[:16].replace("T", " "))
+                is_read = n.get("is_read", False)
+                bg  = "#fff" if is_read else "#fdf6e3"
+                dot = "⚪" if is_read else "🟡"
+                ts  = str(n.get("created_at",""))[:16].replace("T"," ")
+                st.markdown(
+                    f"""<div style="background:{bg};border-radius:8px;padding:0.6rem 0.85rem;
+                                    margin-bottom:0.3rem;border:1px solid {'rgba(0,0,0,0.07)' if is_read else '#c9a84c'}">
+                      <div style="display:flex;gap:0.5rem;align-items:flex-start">
+                        <span style="font-size:0.65rem;margin-top:0.15rem">{dot}</span>
+                        <div>
+                          <p style="margin:0;font-size:0.82rem;font-weight:{'400' if is_read else '600'};
+                                    color:#1a1a2e">{n.get('title','')}</p>
+                          {'<p style="margin:0.1rem 0 0;font-size:0.73rem;color:#6b7280">'+n.get('body','')+'</p>' if n.get('body') else ''}
+                          <p style="margin:0.15rem 0 0;font-size:0.68rem;color:#9ca3af">{ts}</p>
+                        </div>
+                      </div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+            if unread_n:
+                if st.button("Mark all read", key="cp_mark_read", use_container_width=True):
+                    db.mark_notifications_read()
+                    st.rerun()
         else:
             st.caption("No notifications yet.")
 
-# ── My Matters ────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# TAB 2 – MY MATTERS
+# ══════════════════════════════════════════════════════════════════
 with tab_matters:
     matters = db.list_matters()
     if not matters:
@@ -68,71 +122,92 @@ with tab_matters:
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Status",       m.get("status", "—"))
                 c2.metric("Jurisdiction", m.get("jurisdiction", "—"))
-                c3.metric("Open Date",    str(m.get("open_date", "—"))[:10])
-                if m.get("description"):
-                    st.markdown(f"**Description:** {m['description']}")
-                if m.get("court_reference"):
-                    st.markdown(f"**Court Ref:** {m['court_reference']}")
+                c3.metric("Open Date",    str(m.get("open_date", "—") or "—")[:10])
 
-                # Assigned lawyer
+                if m.get("description"):
+                    st.markdown(
+                        f'<div style="background:#f8fafc;border-radius:8px;padding:0.75rem;'
+                        f'margin:0.5rem 0;font-size:0.85rem;color:#374151">'
+                        f'{m["description"]}</div>',
+                        unsafe_allow_html=True,
+                    )
+
                 members = db.get_matter_members(m["id"])
                 lawyers = [mem for mem in members if mem.get("role") in ("lead_lawyer", "lawyer")]
                 if lawyers:
                     names = ", ".join(
-                        mem.get("profiles", {}).get("full_name", "—")
-                        for mem in lawyers
+                        (mem.get("profiles") or {}).get("full_name", "—") for mem in lawyers
                     )
-                    st.markdown(f"**Your Lawyer:** {names}")
+                    st.markdown(
+                        f'<p style="font-size:0.83rem;color:#1a2744"><b>Your Lawyer:</b> {names}</p>',
+                        unsafe_allow_html=True,
+                    )
 
-                # Tasks visible to client
                 tasks = [t for t in db.list_tasks(matter_id=m["id"])
-                         if t.get("status") != "completed"]
+                         if t.get("status") not in ("completed", "cancelled")]
                 if tasks:
                     st.markdown(f"**Upcoming steps ({len(tasks)}):**")
-                    for t in tasks[:5]:
-                        due = str(t.get("due_date", ""))[:10]
-                        st.markdown(f"- {t.get('title','')} {'· due ' + due if due else ''}")
+                    for t in tasks[:6]:
+                        due = str(t.get("due_date",""))[:10]
+                        pri = (t.get("priority") or "").lower()
+                        icon = {"high":"🔴","medium":"🟡","low":"🟢"}.get(pri,"📌")
+                        st.markdown(
+                            f'<div style="font-size:0.83rem;padding:0.2rem 0;color:#374151">'
+                            f'{icon} {t.get("title","")}{"  <small style=\'color:#9ca3af\'>· due "+due+"</small>" if due else ""}'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
 
-# ── My Documents ─────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# TAB 3 – DOCUMENTS
+# ══════════════════════════════════════════════════════════════════
 with tab_docs:
     section("📄 Documents Shared With You")
-    all_docs = db.list_documents()
-    if not all_docs:
-        st.info("No documents have been shared with you yet.")
+    all_docs = db.list_documents(visibility="shared_with_client") or db.list_documents()
+    CLIENT_VIS = {"shared_with_client", "final", "client_upload"}
+    shown_docs = [d for d in all_docs if d.get("visibility","") in CLIENT_VIS]
+
+    if shown_docs:
+        VIS_CFG = {
+            "shared_with_client": ("🟢", "#dcfce7", "#16a34a", "Shared"),
+            "final":              ("🏁", "#e8f0fe", "#1a2744", "Final"),
+            "client_upload":      ("📤", "#fffbeb", "#d97706", "Your upload"),
+        }
+        for d in shown_docs:
+            vis = d.get("visibility","")
+            icon, bg, fg, label = VIS_CFG.get(vis, ("📄","#f8fafc","#6b7280","Document"))
+            st.markdown(
+                f"""<div style="background:#fff;border-radius:9px;padding:0.7rem 1rem;
+                                margin-bottom:0.35rem;border:1px solid rgba(0,0,0,0.07)">
+                  <div style="display:flex;align-items:center;gap:0.6rem">
+                    <span style="font-size:1.1rem">{icon}</span>
+                    <span style="font-weight:600;font-size:0.87rem;color:#1a2744;flex:1">{d['name']}</span>
+                    <span style="background:{bg};color:{fg};font-size:0.7rem;font-weight:600;
+                                 padding:0.15rem 0.45rem;border-radius:20px">{label}</span>
+                    <span style="font-size:0.72rem;color:#9ca3af">{str(d.get('created_at',''))[:10]}</span>
+                  </div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
     else:
-        col_filter = st.selectbox("Filter by matter", ["All matters"] +
-                                   list({d.get("matter_id", "General") for d in all_docs}),
-                                   key="cdoc_filter")
-        shown = all_docs if col_filter == "All matters" else [d for d in all_docs if d.get("matter_id") == col_filter]
+        st.info("No documents have been shared with you yet.")
 
-        for d in shown:
-            c1, c2, c3 = st.columns([4, 2, 1])
-            vis_icon = {"shared_with_client": "🟢", "final": "🏁",
-                        "client_upload": "📤", "draft": "📝"}.get(d.get("visibility",""), "📄")
-            c1.markdown(f"{vis_icon} **{d['name']}**")
-            c2.caption(d.get("visibility", "").replace("_", " ").title())
-            c3.caption(str(d.get("created_at", ""))[:10])
-            st.markdown("---")
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
     section("📤 Upload a Document")
     matters_mine = db.list_matters()
     matter_opts  = {f"{m['ref']}: {m['title'][:35]}": m["id"] for m in matters_mine}
     if matter_opts:
-        sel_matter = st.selectbox("Select matter", list(matter_opts.keys()), key="cup_matter")
-        up_file    = st.file_uploader("Choose file", key="cup_file")
-        up_desc    = st.text_input("Description (optional)", key="cup_desc")
+        sel_m   = st.selectbox("Select matter", list(matter_opts.keys()), key="cup_matter")
+        up_file = st.file_uploader("Choose file", key="cup_file")
+        up_desc = st.text_input("Description (optional)", key="cup_desc")
         if st.button("📤 Upload", type="primary", key="cup_btn") and up_file:
-            doc = db.add_document(
-                name=up_file.name,
-                matter_id=matter_opts[sel_matter],
-                file_type=up_file.type,
-                file_size=up_file.size,
-                visibility="client_upload",
-                description=up_desc.strip(),
+            db.add_document(
+                name=up_file.name, matter_id=matter_opts[sel_m],
+                file_type=up_file.type, file_size=up_file.size,
+                visibility="client_upload", description=up_desc.strip(),
             )
             db.notify_matter_members(
-                matter_opts[sel_matter], "document_uploaded",
+                matter_opts[sel_m], "document_uploaded",
                 f"Client uploaded: {up_file.name}",
                 body=f"Uploaded by {user['full_name']}",
                 exclude_id=user["id"], lawyers_only=True,
@@ -142,119 +217,126 @@ with tab_docs:
     else:
         st.info("You must be assigned to a matter before uploading documents.")
 
-# ── Discussions ───────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# TAB 4 – DISCUSSIONS
+# ══════════════════════════════════════════════════════════════════
 with tab_disc:
     matters_mine = db.list_matters()
     if not matters_mine:
         st.info("No matters assigned yet.")
     else:
         matter_opts = {f"{m['ref']}: {m['title'][:40]}": m["id"] for m in matters_mine}
-        sel = st.selectbox("Select matter to view discussion", list(matter_opts.keys()), key="cdisc_sel")
+        sel = st.selectbox("Select matter", list(matter_opts.keys()), key="cdisc_sel")
         mid = matter_opts[sel]
         db.mark_messages_read(mid)
         messages = db.list_messages(mid)
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="background:#fff;border-radius:12px;padding:1rem;'
+            f'min-height:200px;max-height:420px;overflow-y:auto;'
+            f'border:1px solid rgba(0,0,0,0.08);margin-bottom:0.75rem">',
+            unsafe_allow_html=True,
+        )
         if messages:
             for msg in messages:
                 sender = (msg.get("profiles") or {}).get("full_name", "Unknown")
                 is_mine = msg.get("sender_id") == user["id"]
                 align = "right" if is_mine else "left"
                 bg    = "#dbeafe" if is_mine else "#f1f5f9"
+                fg    = "#1e40af" if is_mine else "#374151"
                 ts    = str(msg.get("created_at",""))[:16].replace("T"," ")
                 st.markdown(
-                    f"""<div style='text-align:{align};margin:.4rem 0'>
-                    <div style='display:inline-block;background:{bg};padding:.6rem 1rem;
-                    border-radius:12px;max-width:75%;text-align:left'>
-                    <small style='color:#64748b'><b>{sender}</b> · {ts}</small><br>
-                    {msg.get('body','')}
-                    </div></div>""",
+                    f"""<div style="text-align:{align};margin:0.4rem 0">
+                      <div style="display:inline-block;background:{bg};color:{fg};
+                                  padding:0.55rem 0.9rem;border-radius:12px;
+                                  max-width:78%;text-align:left">
+                        <small style="color:#64748b;font-size:0.72rem">
+                          <b>{sender}</b> · {ts}</small><br>
+                        <span style="font-size:0.85rem">{msg.get('body','')}</span>
+                      </div>
+                    </div>""",
                     unsafe_allow_html=True,
                 )
-                for att in (msg.get("message_attachments") or []):
-                    st.markdown(f"📎 {att.get('file_name','')}")
         else:
-            st.info("No messages yet. Start the conversation below.")
+            st.markdown(
+                '<p style="text-align:center;color:#9ca3af;padding:2rem 0;font-size:0.85rem">'
+                'No messages yet. Start the conversation below.</p>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
         with st.form("client_msg_form", clear_on_submit=True):
-            body = st.text_area("Your message", height=80, placeholder="Type your message…", key="cmsg_body")
-            att  = st.file_uploader("Attach a file (optional)", key="cmsg_att")
-            sent = st.form_submit_button("Send Message ➤", type="primary")
+            body = st.text_area("Your message", height=80,
+                                 placeholder="Type your message…", key="cmsg_body",
+                                 label_visibility="collapsed")
+            att  = st.file_uploader("Attach file (optional)", key="cmsg_att")
+            sent = st.form_submit_button("Send ➤", type="primary", use_container_width=True)
+
         if sent:
             if not body.strip():
                 st.warning("Message cannot be empty.")
             else:
                 msg = db.send_message(mid, body.strip(), "client_visible")
                 if att and msg:
-                    doc = db.add_document(att.name, mid, file_type=att.type, file_size=att.size,
-                                           visibility="client_upload")
+                    doc = db.add_document(att.name, mid, file_type=att.type,
+                                           file_size=att.size, visibility="client_upload")
                     if doc:
-                        db.add_message_attachment(msg["id"], att.name, doc.get("file_path",""),
-                                                   att.type, att.size, doc.get("id"))
-                db.notify_matter_members(mid, "new_message",
-                    f"New message from {user['full_name']}",
-                    body=body[:100], exclude_id=user["id"], lawyers_only=True)
+                        db.add_message_attachment(msg["id"], att.name,
+                                                   doc.get("file_path",""), att.type,
+                                                   att.size, doc.get("id"))
+                db.notify_matter_members(
+                    mid, "new_message", f"New message from {user['full_name']}",
+                    body=body[:100], exclude_id=user["id"], lawyers_only=True,
+                )
                 st.rerun()
 
-# ── Invoices ──────────────────────────────────────────────────────
-with tab_invoices:
-    section("🧾 My Invoices")
-    org = user.get("organization_id")
-    if org:
-        invoices_resp = (
-            db.get_db().table("invoices")
-            .select("*, matters(ref,title)")
-            .eq("organization_id", org)
-            .order("created_at", desc=True)
-            .execute()
-        )
-        invoices = invoices_resp.data or []
-        if invoices:
-            for inv in invoices:
-                matter_label = ""
-                if inv.get("matters"):
-                    matter_label = f" · {inv['matters'].get('ref','')} {inv['matters'].get('title','')[:30]}"
-                status_color = {
-                    "paid": "#16a34a", "sent": "#2563eb",
-                    "overdue": "#dc2626", "draft": "#64748b",
-                }.get(inv.get("status",""), "#64748b")
-                c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
-                c1.markdown(f"**{inv.get('invoice_number','')}**{matter_label}")
-                c2.markdown(f"£{inv.get('total', 0):,.2f}")
-                c3.caption(str(inv.get("due_date",""))[:10])
-                c4.markdown(f"<span style='color:{status_color}'>{inv.get('status','').title()}</span>",
-                            unsafe_allow_html=True)
-                st.divider()
-        else:
-            st.info("No invoices yet.")
-    else:
-        st.info("No invoices yet.")
-
-# ── Profile ───────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# TAB 5 – PROFILE
+# ══════════════════════════════════════════════════════════════════
 with tab_profile:
-    section("👤 My Profile")
     profile = db.get_profile(user["id"]) or {}
-    c1, c2 = st.columns(2)
-    c1.markdown(f"**Name:** {profile.get('full_name','')}")
-    c1.markdown(f"**Email:** {profile.get('email','')}")
-    c2.markdown(f"**Role:** {profile.get('role','').title()}")
-    c2.markdown(f"**Firm:** {user['organization_name']}")
+    left, right = st.columns(2, gap="large")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    section("🔑 Change Password")
-    with st.form("cp_form"):
-        new_pw  = st.text_input("New Password", type="password", key="cp_pw")
-        new_pw2 = st.text_input("Confirm New Password", type="password", key="cp_pw2")
-        if st.form_submit_button("Update Password"):
-            if len(new_pw) < 8:
-                st.warning("Password must be at least 8 characters.")
-            elif new_pw != new_pw2:
-                st.warning("Passwords do not match.")
-            else:
-                from utils.auth import reset_password
-                result = reset_password(user["id"], new_pw)
-                if result["ok"]:
-                    st.success("✅ Password updated.")
+    with left:
+        section("👤 My Details")
+        st.markdown(
+            f"""<div style="background:#fff;border-radius:12px;padding:1.25rem;
+                            border:1px solid rgba(0,0,0,0.08)">
+              <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+                <div style="background:#1a2744;color:#fff;border-radius:50%;
+                            width:52px;height:52px;display:flex;align-items:center;
+                            justify-content:center;font-size:1.4rem;font-weight:700;flex-shrink:0">
+                  {first_name[0].upper()}</div>
+                <div>
+                  <p style="margin:0;font-weight:700;color:#1a2744;font-size:1rem">
+                    {profile.get('full_name','')}</p>
+                  <p style="margin:0;font-size:0.82rem;color:#6b7280">{profile.get('email','')}</p>
+                </div>
+              </div>
+              <div style="border-top:1px solid #f1f5f9;padding-top:0.75rem">
+                <p style="margin:0.2rem 0;font-size:0.83rem;color:#374151">
+                  <b>Role:</b> {profile.get('role','client').title()}</p>
+                <p style="margin:0.2rem 0;font-size:0.83rem;color:#374151">
+                  <b>Firm:</b> {user['organization_name']}</p>
+              </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    with right:
+        section("🔑 Change Password")
+        with st.form("cp_form"):
+            new_pw  = st.text_input("New Password", type="password", key="cp_pw")
+            new_pw2 = st.text_input("Confirm Password", type="password", key="cp_pw2")
+            if st.form_submit_button("Update Password", type="primary"):
+                if len(new_pw) < 8:
+                    st.warning("Password must be at least 8 characters.")
+                elif new_pw != new_pw2:
+                    st.warning("Passwords do not match.")
                 else:
-                    st.error(result["error"])
+                    from utils.auth import reset_password
+                    result = reset_password(user["id"], new_pw)
+                    if result["ok"]:
+                        st.success("✅ Password updated.")
+                    else:
+                        st.error(result["error"])
