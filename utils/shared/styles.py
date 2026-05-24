@@ -257,18 +257,29 @@ p, li, span, label { color: var(--text-body) !important; }
     transform: translateY(0px) !important;
     box-shadow: var(--shadow-sm) !important;
 }
-/* Primary type — gold accent */
+/* Primary type */
 .stButton > [data-testid="baseButton-primary"],
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%) !important;
+    background: linear-gradient(135deg, #1a2744 0%, #253461 100%) !important;
     color: #ffffff !important;
     box-shadow: 0 4px 14px rgba(26,39,68,0.25) !important;
 }
 .stButton > [data-testid="baseButton-primary"]:hover,
 .stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, var(--navy-hover) 0%, var(--navy) 100%) !important;
+    background: linear-gradient(135deg, #0f1a33 0%, #1a2744 100%) !important;
     box-shadow: 0 6px 20px rgba(26,39,68,0.3) !important;
     transform: translateY(-2px) !important;
+}
+/* Force white text on ALL button states — overrides any Streamlit default blue */
+.stButton > button,
+.stButton > button:visited,
+.stButton > button:hover,
+.stButton > button:active,
+.stButton > button:focus,
+.stButton > button p,
+.stButton > button span,
+.stButton > button div {
+    color: #ffffff !important;
 }
 /* Download = gold */
 .stDownloadButton > button {
