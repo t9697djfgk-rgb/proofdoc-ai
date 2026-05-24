@@ -4,56 +4,6 @@ from utils.shared.styles import inject_css
 
 inject_css()
 
-# ── Debug mode: visit ?debug=1 to test connection ─────────────────────────────
-if st.query_params.get("debug") == "1":
-    import os, sys
-    st.title("🔧 Railway Connection Diagnostics")
-    st.markdown("---")
-
-    st.subheader("1. Environment Variables")
-    for key in ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY", "ANTHROPIC_API_KEY"]:
-        val = os.environ.get(key, "").strip()
-        if val:
-            masked = val[:12] + "..." + val[-6:]
-            st.success(f"✅ **{key}**: `{masked}`")
-        else:
-            st.error(f"❌ **{key}**: NOT SET")
-
-    st.subheader("2. Supabase Auth Test")
-    try:
-        from supabase import create_client
-        _url  = os.environ.get("SUPABASE_URL", "").strip()
-        _anon = os.environ.get("SUPABASE_ANON_KEY", "").strip()
-        if _url and _anon:
-            client = create_client(_url, _anon)
-            resp = client.auth.sign_in_with_password({
-                "email": "legalexpertschambers@gmail.com",
-                "password": "Nzeyimana@123"
-            })
-            if resp.user:
-                st.success(f"✅ Login OK — user: `{resp.user.email}`, id: `{resp.user.id}`")
-            else:
-                st.error("❌ Login returned no user")
-        else:
-            st.error("❌ Cannot test — SUPABASE_URL or SUPABASE_ANON_KEY missing")
-    except Exception as e:
-        st.error(f"❌ Auth error: `{e}`")
-
-    st.subheader("3. Supabase Profile Test")
-    try:
-        from utils.auth import sign_in
-        result = sign_in("legalexpertschambers@gmail.com", "Nzeyimana@123")
-        if result["ok"]:
-            st.success(f"✅ Full sign_in OK — role: `{result['user']['role']}`, org: `{result['user']['organization_name']}`")
-        else:
-            st.error(f"❌ sign_in failed: `{result['error']}`")
-    except Exception as e:
-        st.error(f"❌ Exception: `{e}`")
-
-    st.markdown("---")
-    st.caption(f"Python {sys.version} · Streamlit {st.__version__}")
-    st.stop()
-
 # ── Page-level overrides ──────────────────────────────────────────────────────
 st.markdown("""
 <style>
