@@ -71,7 +71,8 @@ elif user["role"] == "admin":
                 st.Page("pages/p_audit.py",      title="Audit Trail",      icon="📋"),
             ],
             "Settings": [
-                st.Page("pages/p_settings.py", title="Settings", icon="⚙️"),
+                st.Page("pages/p_settings.py",   title="Settings",        icon="⚙️"),
+                st.Page("pages/p_onboarding.py", title="Getting Started", icon="🚀"),
             ],
         },
         position="sidebar",
@@ -119,7 +120,8 @@ else:
                 st.Page("pages/p_audit.py",      title="Audit Trail",      icon="📋"),
             ],
             "Settings": [
-                st.Page("pages/p_settings.py", title="Settings", icon="⚙️"),
+                st.Page("pages/p_settings.py",   title="Settings",        icon="⚙️"),
+                st.Page("pages/p_onboarding.py", title="Getting Started", icon="🚀"),
             ],
         },
         position="sidebar",

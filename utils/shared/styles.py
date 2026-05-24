@@ -1009,6 +1009,86 @@ hr {
     line-height: 1.55 !important;
 }
 
+/* ═══════════════════════════════════════════════════
+   MOBILE RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Stack columns on small screens */
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* Tighten page padding */
+    .block-container {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        padding-top: 1rem !important;
+    }
+
+    /* Make page header readable on small screens */
+    .page-header {
+        padding: 1rem !important;
+    }
+    .page-header h1 {
+        font-size: 1.4rem !important;
+    }
+    .page-header p {
+        font-size: 0.82rem !important;
+    }
+
+    /* Shrink metric cards */
+    .metric-card {
+        padding: 0.75rem !important;
+    }
+    .metric-value {
+        font-size: 1.4rem !important;
+    }
+
+    /* Full-width buttons on mobile */
+    .stButton > button {
+        width: 100% !important;
+    }
+
+    /* Tabs scroll horizontally */
+    .stTabs [data-baseweb="tab-list"] {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+    }
+
+    /* Sidebar collapses by default — handled by Streamlit itself */
+    section[data-testid="stSidebar"] {
+        width: 240px !important;
+        min-width: 240px !important;
+    }
+
+    /* Table / dataframe horizontal scroll */
+    [data-testid="stDataFrame"],
+    .stDataFrame {
+        overflow-x: auto !important;
+    }
+
+    /* Doc cards full width */
+    .doc-card,
+    .matter-card {
+        margin-bottom: 0.6rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-header h1 {
+        font-size: 1.15rem !important;
+    }
+    .metric-value {
+        font-size: 1.15rem !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        font-size: 0.75rem !important;
+        padding: 0.4rem 0.6rem !important;
+    }
+}
+
 </style>
 """
 

@@ -57,6 +57,45 @@ def download_docx(label: str, text: str, filename: str, key: str | None = None) 
     )
 
 
+def download_pdf(label: str, text: str, filename: str, title: str = "", key: str | None = None) -> None:
+    """Render plain text as a PDF using fpdf2 and offer it as a download."""
+    import io
+    from fpdf import FPDF
+
+    class _PDF(FPDF):
+        def header(self):
+            if title:
+                self.set_font("Helvetica", "B", 13)
+                self.cell(0, 10, title, align="C", new_x="LMARGIN", new_y="NEXT")
+                self.ln(2)
+
+    pdf = _PDF(orientation="P", unit="mm", format="A4")
+    pdf.set_margins(20, 20, 20)
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=10)
+    for line in text.split("\n"):
+        if line.strip().startswith("─") or line.strip().startswith("="):
+            pdf.set_draw_color(200, 168, 76)
+            pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+            pdf.ln(3)
+        elif line.strip() and line.strip() == line.strip().upper() and len(line.strip()) > 3:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.multi_cell(0, 6, line)
+            pdf.set_font("Helvetica", size=10)
+        else:
+            pdf.multi_cell(0, 5.5, line if line else " ")
+    buf = io.BytesIO(pdf.output())
+    st.download_button(
+        label=label,
+        data=buf.read(),
+        file_name=filename,
+        mime="application/pdf",
+        use_container_width=True,
+        key=key,
+    )
+
+
 def action_row(
     text_to_download: str,
     base_filename: str,

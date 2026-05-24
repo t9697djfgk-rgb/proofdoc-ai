@@ -19,16 +19,42 @@ def render_sidebar(tool_name: str = "") -> str | None:
                 st.rerun()
             st.divider()
 
-        # ── Notifications badge ────────────────────────────────────
+        # ── Global search ──────────────────────────────────────────
+        if user and user.get("role") != "client":
+            query = st.text_input("🔍 Search", placeholder="Matters, clients, docs…",
+                                  key="sb_search", label_visibility="collapsed")
+            if query and len(query) >= 2:
+                _render_search_results(query)
+            st.divider()
+
+        # ── Notifications ──────────────────────────────────────────
         if user:
             from utils import database as db
             unread = db.unread_notification_count()
-            if unread > 0:
-                st.markdown(f"🔔 **{unread} unread notification{'s' if unread > 1 else ''}**")
-                if st.button("Mark all read", key="sb_mark_read", use_container_width=False):
-                    db.mark_notifications_read()
-                    st.rerun()
-                st.divider()
+            bell = f"🔔 **{unread} unread**" if unread > 0 else "🔕 Notifications"
+            with st.expander(bell, expanded=unread > 0):
+                if unread > 0:
+                    if st.button("✓ Mark all read", key="sb_mark_read", use_container_width=True):
+                        db.mark_notifications_read()
+                        st.rerun()
+                notifications = db.list_notifications(limit=10)
+                if notifications:
+                    for n in notifications:
+                        is_unread = not n.get("read_at")
+                        dot = "🔵 " if is_unread else "   "
+                        ts = (n.get("created_at") or "")[:16].replace("T", " ")
+                        st.markdown(
+                            f"<div style='padding:0.35rem 0.5rem;border-radius:6px;"
+                            f"background:{'rgba(201,168,76,0.08)' if is_unread else 'transparent'};"
+                            f"margin-bottom:0.25rem;font-size:0.8rem;line-height:1.4'>"
+                            f"{dot}<b>{n.get('title','')}</b><br>"
+                            f"<span style='color:#6b7280'>{n.get('message','')}</span><br>"
+                            f"<span style='color:#9ca3af;font-size:0.72rem'>{ts}</span></div>",
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.caption("No notifications yet.")
+            st.divider()
 
         # ── API key (for AI tools — lawyers/staff only) ───────────
         api_key = None
@@ -63,6 +89,49 @@ def render_sidebar(tool_name: str = "") -> str | None:
         st.caption("⚠️ AI output does not replace qualified legal advice.")
 
     return api_key
+
+
+def _render_search_results(query: str) -> None:
+    from utils import database as db
+    q = query.lower()
+    results = []
+
+    try:
+        for m in db.list_matters()[:50]:
+            if q in (m.get("title") or "").lower() or q in (m.get("reference_number") or "").lower():
+                results.append(("📁", m.get("title", "Untitled"), m.get("reference_number", ""), "Matter"))
+    except Exception:
+        pass
+
+    try:
+        for c in db.list_clients()[:50]:
+            name = c.get("name") or c.get("company_name") or ""
+            if q in name.lower():
+                results.append(("🏢", name, c.get("email", ""), "Client"))
+    except Exception:
+        pass
+
+    try:
+        for d in db.list_documents()[:50]:
+            if q in (d.get("file_name") or "").lower() or q in (d.get("title") or "").lower():
+                results.append(("📄", d.get("title") or d.get("file_name", ""), "", "Document"))
+    except Exception:
+        pass
+
+    if results:
+        for icon, title, sub, kind in results[:6]:
+            st.markdown(
+                f"<div style='padding:0.3rem 0.4rem;border-radius:5px;background:rgba(26,39,68,0.04);"
+                f"margin-bottom:0.2rem;font-size:0.78rem'>"
+                f"{icon} <b>{title}</b>"
+                f"{'<br><span style=\"color:#6b7280\">' + sub + '</span>' if sub else ''}"
+                f" <span style='float:right;color:#9ca3af;font-size:0.7rem'>{kind}</span></div>",
+                unsafe_allow_html=True,
+            )
+        if len(results) > 6:
+            st.caption(f"+{len(results)-6} more results")
+    else:
+        st.caption("No matches found.")
 
 
 def setup_page(section: str = "") -> str | None:

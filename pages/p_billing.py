@@ -297,12 +297,18 @@ with tab_invoices:
             </div>""",
             unsafe_allow_html=True,
         )
-        c1, c2 = st.columns(2)
+        c1, c2, c3 = st.columns(3)
         c1.download_button(
-            "⬇️ Download Invoice (.txt)", st.session_state.inv_preview,
+            "⬇️ Download (.txt)", st.session_state.inv_preview,
             "invoice.txt", "text/plain", use_container_width=True, key="inv_dl",
         )
-        if c2.button("🗑️ Clear", use_container_width=True, key="inv_clr"):
+        with c2:
+            from utils.shared.export_utils import download_pdf
+            download_pdf(
+                "📄 Download (.pdf)", st.session_state.inv_preview,
+                "invoice.pdf", title="Invoice", key="inv_dl_pdf",
+            )
+        if c3.button("🗑️ Clear", use_container_width=True, key="inv_clr"):
             st.session_state.pop("inv_preview", None)
             st.rerun()
 
