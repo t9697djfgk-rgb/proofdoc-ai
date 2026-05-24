@@ -6,9 +6,16 @@ inject_css()
 st.markdown(
     """
     <style>
-    [data-testid="stAppViewContainer"]{background:#f1f5f9}
-    .login-box{max-width:420px;margin:3rem auto;background:#fff;
-        border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:2.5rem}
+    [data-testid="stSidebarNav"]{display:none}
+    [data-testid="collapsedControl"]{display:none}
+    section[data-testid="stSidebar"]{display:none}
+    .login-hero{text-align:center;padding:2.5rem 0 1.5rem}
+    .login-brand{font-size:2.4rem;font-weight:800;letter-spacing:-0.03em;
+        background:linear-gradient(135deg,#4f7cf7,#d4a853);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+        background-clip:text}
+    .login-tagline{color:#8a93ab;font-size:.9rem;letter-spacing:.08em;
+        text-transform:uppercase;margin-top:.3rem}
     </style>
     """,
     unsafe_allow_html=True,
@@ -17,8 +24,13 @@ st.markdown(
 _, col, _ = st.columns([1, 2, 1])
 
 with col:
-    st.markdown("## ⚖️ eLawFirm")
-    st.markdown("##### Secure Legal Workspace")
+    st.markdown(
+        '<div class="login-hero">'
+        '<div class="login-brand">⚖ eLawFirm</div>'
+        '<div class="login-tagline">Secure Legal Workspace</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown("<br>", unsafe_allow_html=True)
 
     tab_login, tab_register = st.tabs(["Sign In", "Register New Firm"])
