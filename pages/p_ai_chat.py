@@ -8,7 +8,14 @@ import utils.database as db
 api_key = setup_page()
 require_lawyer()
 
-slim_header("💬", "Legal AI Assistant", "Ask anything — powered by Claude Opus 4.7")
+_hdr, _btn = st.columns([5, 1])
+with _hdr:
+    slim_header("💬", "Legal AI Assistant", "Ask anything — powered by Claude Opus 4.7")
+with _btn:
+    st.markdown("<div style='height:1.6rem'></div>", unsafe_allow_html=True)
+    if st.button("＋ New Chat", type="primary", use_container_width=True, key="chat_new_top"):
+        st.session_state.chat_messages = []
+        st.rerun()
 
 # ── Session state ──────────────────────────────────────────────────
 if "chat_messages" not in st.session_state:
