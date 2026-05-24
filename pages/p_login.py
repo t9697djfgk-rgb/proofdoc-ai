@@ -394,6 +394,19 @@ with col_form:
                 else:
                     reg_msg.error(f"❌ {result['error']}")
 
+    # ── Connection diagnostics (always visible) ───────────────────────
+    import os as _diag_os
+    _d_url  = bool(_diag_os.environ.get("SUPABASE_URL", "").strip())
+    _d_anon = bool(_diag_os.environ.get("SUPABASE_ANON_KEY", "").strip())
+    _d_svc  = bool(_diag_os.environ.get("SUPABASE_SERVICE_KEY", "").strip())
+    if not (_d_url and _d_anon and _d_svc):
+        st.warning(
+            f"⚙️ **Railway env vars missing:**  "
+            f"SUPABASE_URL {'✅' if _d_url else '❌'}  "
+            f"SUPABASE_ANON_KEY {'✅' if _d_anon else '❌'}  "
+            f"SUPABASE_SERVICE_KEY {'✅' if _d_svc else '❌'}"
+        )
+
     st.markdown(
         "<div class='f-foot'>&#9878; eLawFirm &nbsp;&middot;&nbsp; AI output does not replace qualified legal advice</div>",
         unsafe_allow_html=True,
