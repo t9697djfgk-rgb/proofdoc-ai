@@ -383,34 +383,33 @@ with col_form:
             + "  ·  Go to Railway → your project → Variables and add them."
         )
 
-    # ── Show stored feedback from previous run ─────────────────────
+    # ── Error / info from previous click ──────────────────────────
     _msg = st.session_state.pop("_auth_msg", None)
     if _msg:
         getattr(st, _msg[0])(_msg[1])
 
-    # ── Sign-in form ───────────────────────────────────────────────
-    with st.form("login_form", clear_on_submit=False):
-        email    = st.text_input("Email address", placeholder="you@yourfirm.com")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Sign In →", type="primary", use_container_width=True)
+    # ── Sign-in inputs + button (no st.form wrapper) ───────────────
+    email    = st.text_input("Email address", placeholder="you@yourfirm.com", key="li_email")
+    password = st.text_input("Password", type="password", key="li_pw")
 
-    if submitted:
+    if st.button("Sign In →", type="primary", use_container_width=True, key="li_btn"):
         if not email.strip() or not password:
             st.session_state["_auth_msg"] = ("warning", "Please enter your email and password.")
+            st.rerun()
         else:
             try:
                 result = sign_in(email.strip(), password)
-                if result["ok"]:
-                    st.rerun()
-                else:
-                    st.session_state["_auth_msg"] = ("error", f"❌ {result['error']}")
             except Exception as exc:
-                st.session_state["_auth_msg"] = ("error", f"❌ Unexpected error: {exc}")
-        st.rerun()
+                result = {"ok": False, "error": str(exc)}
+            if result["ok"]:
+                st.rerun()
+            else:
+                st.session_state["_auth_msg"] = ("error", f"❌ {result['error']}")
+                st.rerun()
 
     st.caption("Forgot your password? Ask your firm administrator to reset it.")
 
-    # ── Register new firm (collapsed by default) ───────────────────
+    # ── Register new firm ──────────────────────────────────────────
     with st.expander("Create a new firm account"):
         _reg_msg = st.session_state.pop("_reg_msg", None)
         if _reg_msg:
@@ -421,19 +420,16 @@ with col_form:
             "You will become the <strong style='color:#1a2744'>admin</strong> for the new firm.</p>",
             unsafe_allow_html=True,
         )
-        with st.form("register_form", clear_on_submit=False):
-            firm_name = st.text_input("Law Firm Name", placeholder="e.g. Nkurunziza & Associates")
-            full_name = st.text_input("Your Full Name", placeholder="e.g. Marie Uwimana")
-            reg_email = st.text_input("Email", placeholder="admin@yourfirm.com")
-            c1, c2 = st.columns(2)
-            with c1:
-                reg_pw  = st.text_input("Password", type="password", help="Min 8 characters")
-            with c2:
-                reg_pw2 = st.text_input("Confirm password", type="password")
-            reg_submitted = st.form_submit_button("Create Firm Account →", type="primary",
-                                                   use_container_width=True)
+        firm_name = st.text_input("Law Firm Name", placeholder="e.g. Nkurunziza & Associates", key="reg_firm")
+        full_name = st.text_input("Your Full Name", placeholder="e.g. Marie Uwimana",           key="reg_name")
+        reg_email = st.text_input("Email",          placeholder="admin@yourfirm.com",            key="reg_email")
+        c1, c2 = st.columns(2)
+        with c1:
+            reg_pw  = st.text_input("Password",         type="password", key="reg_pw")
+        with c2:
+            reg_pw2 = st.text_input("Confirm password", type="password", key="reg_pw2")
 
-        if reg_submitted:
+        if st.button("Create Firm Account →", type="primary", use_container_width=True, key="reg_btn"):
             errors = []
             if not firm_name.strip(): errors.append("Firm name required.")
             if not full_name.strip(): errors.append("Your name required.")
@@ -442,17 +438,17 @@ with col_form:
             if reg_pw != reg_pw2:     errors.append("Passwords don't match.")
             if errors:
                 st.session_state["_reg_msg"] = ("warning", " · ".join(errors))
+                st.rerun()
             else:
                 try:
-                    result = register_firm(firm_name.strip(), reg_email.strip(),
-                                           reg_pw, full_name.strip())
-                    if result["ok"]:
-                        st.rerun()
-                    else:
-                        st.session_state["_reg_msg"] = ("error", f"❌ {result['error']}")
+                    result = register_firm(firm_name.strip(), reg_email.strip(), reg_pw, full_name.strip())
                 except Exception as exc:
-                    st.session_state["_reg_msg"] = ("error", f"❌ Unexpected error: {exc}")
-            st.rerun()
+                    result = {"ok": False, "error": str(exc)}
+                if result["ok"]:
+                    st.rerun()
+                else:
+                    st.session_state["_reg_msg"] = ("error", f"❌ {result['error']}")
+                    st.rerun()
 
     st.markdown(
         "<div class='f-foot'>&#9878; eLawFirm &nbsp;&middot;&nbsp; AI output does not replace qualified legal advice</div>",
