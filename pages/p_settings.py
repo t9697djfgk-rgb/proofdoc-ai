@@ -91,7 +91,10 @@ with tab_map["🤖 AI Settings"]:
     section("🤖 AI Configuration")
     st.markdown("**Current AI Provider:** Anthropic Claude Opus 4.7")
     try:
-        _ = st.secrets["ANTHROPIC_API_KEY"]
+        import os as _os
+        _ = st.secrets.get("ANTHROPIC_API_KEY") or _os.environ.get("ANTHROPIC_API_KEY") or ""
+        if not _:
+            raise KeyError
         st.success("✅ API key loaded from secrets")
     except Exception:
         st.warning("⚠️ API key not found in secrets.toml — enter it in the sidebar to use AI tools")

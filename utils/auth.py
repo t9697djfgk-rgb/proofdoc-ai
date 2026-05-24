@@ -1,10 +1,18 @@
+import os
 import streamlit as st
 from supabase import create_client, Client
 
 
+def _secret(key: str) -> str:
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.environ.get(key, "")
+
+
 @st.cache_resource
 def _service_client() -> Client:
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_SERVICE_KEY"])
+    return create_client(_secret("SUPABASE_URL"), _secret("SUPABASE_SERVICE_KEY"))
 
 
 def get_supabase() -> Client:
@@ -15,7 +23,7 @@ def get_supabase() -> Client:
 
 def sign_in(email: str, password: str) -> dict:
     try:
-        anon = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_ANON_KEY"])
+        anon = create_client(_secret("SUPABASE_URL"), _secret("SUPABASE_ANON_KEY"))
         resp = anon.auth.sign_in_with_password({"email": email, "password": password})
         if not resp.user:
             return {"ok": False, "error": "Invalid email or password."}
