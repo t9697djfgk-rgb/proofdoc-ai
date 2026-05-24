@@ -162,8 +162,8 @@ with tab3:
             ]
         st.caption(f"{len(clauses)} clause(s) found")
         for cl in clauses:
-            with st.expander(f"**{cl.get('name','')}** · {cl.get('category','')} · {cl.get('jurisdiction','')}"):
-                st.markdown(f'<div class="revised-doc">{cl.get("text","")}</div>', unsafe_allow_html=True)
+            with st.expander(f"**{cl.get('title',cl.get('name',''))}** · {cl.get('category','')} · {cl.get('jurisdiction','')}"):
+                st.markdown(f'<div class="revised-doc">{cl.get("clause_text", cl.get("text",""))}</div>', unsafe_allow_html=True)
                 if cl.get("notes"): st.caption(f"📝 Notes: {cl['notes']}")
                 approved = cl.get("approved", False)
                 st.markdown(
@@ -190,7 +190,7 @@ with tab3:
         no = st.text_area("Notes", height=60, key="cl_ano")
         if st.button("➕ Add Clause", type="primary", key="cl_abtn"):
             if na.strip() and ta.strip():
-                add_clause(name=na, category=ca, jurisdiction=ja, text=ta, notes=no)
+                add_clause(title=na, category=ca, jurisdiction=ja, clause_text=ta, notes=no)
                 st.success("✅ Clause added!")
             else:
                 st.warning("⚠️ Name and text are required.")
