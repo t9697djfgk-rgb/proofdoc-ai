@@ -5,9 +5,105 @@ from utils.auth import require_lawyer
 import utils.database as db
 from datetime import date
 
+
+def _inject_bg() -> None:
+    st.markdown("""
+<style>
+@keyframes dashFloatUp {
+    0%   { transform:translateY(100vh) rotate(-8deg); opacity:0; }
+    6%   { opacity:0.08; }
+    94%  { opacity:0.08; }
+    100% { transform:translateY(-60px) rotate(8deg); opacity:0; }
+}
+.dash-sym {
+    position:fixed; bottom:-60px; pointer-events:none; z-index:1;
+    color:#1a2744; user-select:none;
+    animation:dashFloatUp linear infinite;
+}
+</style>
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     style="position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:1">
+  <defs><style>
+    .nl{stroke:#1a2744;stroke-width:1;fill:none;animation:nlP ease-in-out infinite}
+    .ng{fill:#c9a84c;animation:ndP ease-in-out infinite}
+    .nn{fill:#1a2744;animation:ndP ease-in-out infinite}
+    @keyframes ndP{0%,100%{opacity:.10}50%{opacity:.24}}
+    @keyframes nlP{0%,100%{opacity:.05}50%{opacity:.13}}
+  </style></defs>
+
+  <!-- Top row connections -->
+  <line class="nl" x1="8%"  y1="12%" x2="24%" y2="26%" style="animation-delay:.2s;animation-duration:4.1s"/>
+  <line class="nl" x1="24%" y1="26%" x2="38%" y2="10%" style="animation-delay:.7s;animation-duration:5.2s"/>
+  <line class="nl" x1="38%" y1="10%" x2="55%" y2="22%" style="animation-delay:1.3s;animation-duration:3.8s"/>
+  <line class="nl" x1="55%" y1="22%" x2="70%" y2="12%" style="animation-delay:.4s;animation-duration:4.7s"/>
+  <line class="nl" x1="70%" y1="12%" x2="84%" y2="28%" style="animation-delay:1.8s;animation-duration:4.3s"/>
+  <line class="nl" x1="84%" y1="28%" x2="96%" y2="14%" style="animation-delay:.9s;animation-duration:5.0s"/>
+  <!-- Top → Mid verticals -->
+  <line class="nl" x1="8%"  y1="12%" x2="14%" y2="50%" style="animation-delay:.5s;animation-duration:4.6s"/>
+  <line class="nl" x1="24%" y1="26%" x2="30%" y2="60%" style="animation-delay:1.1s;animation-duration:3.9s"/>
+  <line class="nl" x1="55%" y1="22%" x2="50%" y2="56%" style="animation-delay:.3s;animation-duration:5.4s"/>
+  <line class="nl" x1="70%" y1="12%" x2="66%" y2="54%" style="animation-delay:1.6s;animation-duration:4.2s"/>
+  <line class="nl" x1="96%" y1="14%" x2="90%" y2="50%" style="animation-delay:.8s;animation-duration:3.7s"/>
+  <!-- Mid row connections -->
+  <line class="nl" x1="14%" y1="50%" x2="30%" y2="60%" style="animation-delay:1.4s;animation-duration:4.8s"/>
+  <line class="nl" x1="30%" y1="60%" x2="50%" y2="56%" style="animation-delay:.6s;animation-duration:5.1s"/>
+  <line class="nl" x1="50%" y1="56%" x2="66%" y2="54%" style="animation-delay:1.9s;animation-duration:3.6s"/>
+  <line class="nl" x1="66%" y1="54%" x2="80%" y2="62%" style="animation-delay:.15s;animation-duration:4.4s"/>
+  <line class="nl" x1="80%" y1="62%" x2="90%" y2="50%" style="animation-delay:1.2s;animation-duration:5.3s"/>
+  <!-- Mid → Bottom verticals -->
+  <line class="nl" x1="14%" y1="50%" x2="8%"  y2="80%" style="animation-delay:.45s;animation-duration:4.0s"/>
+  <line class="nl" x1="30%" y1="60%" x2="26%" y2="84%" style="animation-delay:1.7s;animation-duration:4.5s"/>
+  <line class="nl" x1="50%" y1="56%" x2="52%" y2="82%" style="animation-delay:.25s;animation-duration:5.5s"/>
+  <line class="nl" x1="66%" y1="54%" x2="72%" y2="80%" style="animation-delay:1.05s;animation-duration:3.5s"/>
+  <line class="nl" x1="90%" y1="50%" x2="94%" y2="80%" style="animation-delay:.65s;animation-duration:4.9s"/>
+  <!-- Bottom row connections -->
+  <line class="nl" x1="8%"  y1="80%" x2="26%" y2="84%" style="animation-delay:1.55s;animation-duration:4.6s"/>
+  <line class="nl" x1="26%" y1="84%" x2="52%" y2="82%" style="animation-delay:.35s;animation-duration:5.0s"/>
+  <line class="nl" x1="52%" y1="82%" x2="72%" y2="80%" style="animation-delay:1.85s;animation-duration:3.8s"/>
+  <line class="nl" x1="72%" y1="80%" x2="94%" y2="80%" style="animation-delay:.75s;animation-duration:4.3s"/>
+
+  <!-- Gold primary nodes -->
+  <circle class="ng" cx="8%"  cy="12%" r="5" style="animation-delay:0s;animation-duration:3.0s"/>
+  <circle class="ng" cx="55%" cy="22%" r="6" style="animation-delay:.6s;animation-duration:3.6s"/>
+  <circle class="ng" cx="96%" cy="14%" r="4" style="animation-delay:1.2s;animation-duration:4.2s"/>
+  <circle class="ng" cx="50%" cy="56%" r="5" style="animation-delay:.3s;animation-duration:2.8s"/>
+  <circle class="ng" cx="52%" cy="82%" r="6" style="animation-delay:.9s;animation-duration:3.4s"/>
+  <circle class="ng" cx="8%"  cy="80%" r="4" style="animation-delay:1.5s;animation-duration:3.8s"/>
+  <!-- Navy secondary nodes -->
+  <circle class="nn" cx="24%" cy="26%" r="3.5" style="animation-delay:.4s;animation-duration:4.5s"/>
+  <circle class="nn" cx="38%" cy="10%" r="3"   style="animation-delay:1.1s;animation-duration:3.9s"/>
+  <circle class="nn" cx="70%" cy="12%" r="4"   style="animation-delay:.7s;animation-duration:4.2s"/>
+  <circle class="nn" cx="84%" cy="28%" r="3"   style="animation-delay:1.6s;animation-duration:3.5s"/>
+  <circle class="nn" cx="14%" cy="50%" r="3.5" style="animation-delay:.2s;animation-duration:5.0s"/>
+  <circle class="nn" cx="30%" cy="60%" r="3"   style="animation-delay:1.0s;animation-duration:4.4s"/>
+  <circle class="nn" cx="66%" cy="54%" r="4"   style="animation-delay:.5s;animation-duration:3.9s"/>
+  <circle class="nn" cx="80%" cy="62%" r="3"   style="animation-delay:1.4s;animation-duration:4.7s"/>
+  <circle class="nn" cx="90%" cy="50%" r="3.5" style="animation-delay:.8s;animation-duration:3.6s"/>
+  <circle class="nn" cx="26%" cy="84%" r="3"   style="animation-delay:1.3s;animation-duration:5.1s"/>
+  <circle class="nn" cx="72%" cy="80%" r="4"   style="animation-delay:.1s;animation-duration:4.3s"/>
+  <circle class="nn" cx="94%" cy="80%" r="3"   style="animation-delay:1.7s;animation-duration:3.7s"/>
+</svg>
+
+<!-- Floating legal + AI symbols -->
+<span class="dash-sym" style="left:3%;font-size:1.6rem;animation-duration:22s;animation-delay:0s">§</span>
+<span class="dash-sym" style="left:11%;font-size:1.1rem;animation-duration:18s;animation-delay:7s">⚖</span>
+<span class="dash-sym" style="left:19%;font-size:1.3rem;animation-duration:26s;animation-delay:3s">¶</span>
+<span class="dash-sym" style="left:28%;font-size:1.0rem;animation-duration:20s;animation-delay:11s">§</span>
+<span class="dash-sym" style="left:37%;font-size:1.4rem;animation-duration:24s;animation-delay:2s">⚖</span>
+<span class="dash-sym" style="left:46%;font-size:1.1rem;animation-duration:19s;animation-delay:9s">¶</span>
+<span class="dash-sym" style="left:57%;font-size:1.5rem;animation-duration:23s;animation-delay:5s">§</span>
+<span class="dash-sym" style="left:67%;font-size:1.2rem;animation-duration:21s;animation-delay:14s">⚖</span>
+<span class="dash-sym" style="left:76%;font-size:1.0rem;animation-duration:25s;animation-delay:1s">¶</span>
+<span class="dash-sym" style="left:85%;font-size:1.4rem;animation-duration:17s;animation-delay:8s">§</span>
+<span class="dash-sym" style="left:93%;font-size:1.3rem;animation-duration:22s;animation-delay:4s">⚖</span>
+    """, unsafe_allow_html=True)
+
+
 setup_page()
 user = require_lawyer()
 inject_css()
+_inject_bg()
 
 first_name = user["full_name"].split()[0]
 org_name   = user["organization_name"]
