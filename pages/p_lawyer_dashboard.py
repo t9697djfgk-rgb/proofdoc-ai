@@ -132,12 +132,14 @@ st.markdown(
 stats  = db.dashboard_stats()
 notifs = db.list_notifications(limit=8)
 
-active_matters = stats.get("active_matters", 0)
-total_clients  = stats.get("total_clients",  0)
-pending_tasks  = stats.get("pending_tasks",  0)
-overdue_tasks  = stats.get("overdue_tasks",  0)
-recent_matters = stats.get("recent_matters", [])
-overdue_list   = stats.get("overdue_task_list", [])
+active_matters  = stats.get("active_matters", 0)
+total_clients   = stats.get("total_clients",  0)
+pending_tasks   = stats.get("pending_tasks",  0)
+overdue_tasks   = stats.get("overdue_tasks",  0)
+recent_matters  = stats.get("recent_matters", [])
+overdue_list    = stats.get("overdue_task_list", [])
+upcoming_tasks  = stats.get("upcoming_tasks", [])
+recent_activity = stats.get("recent_activity", [])
 
 # ── KPI Cards ─────────────────────────────────────────────────────
 CARDS = [
@@ -227,6 +229,46 @@ with left:
 
     if st.button("View all matters →", key="dash_all_matters"):
         st.switch_page("pages/p_matters_list.py")
+
+    st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
+
+    # ── Upcoming deadlines ─────────────────────────────────────────
+    st.markdown(
+        '<p style="font-size:0.78rem;font-weight:700;color:#1a2744;text-transform:uppercase;'
+        'letter-spacing:0.07em;margin-bottom:0.75rem">📅 Upcoming Deadlines (14 days)</p>',
+        unsafe_allow_html=True,
+    )
+    if upcoming_tasks:
+        for t in upcoming_tasks:
+            _due_s = str(t.get("due_date", ""))[:10]
+            try:
+                import datetime as _dt3
+                _days_left = (_dt3.date.fromisoformat(_due_s) - date.today()).days
+                _dl_label = "Today" if _days_left == 0 else f"in {_days_left}d"
+                _dl_color = "#7c3aed" if _days_left == 0 else ("#d97706" if _days_left <= 3 else "#059669")
+            except Exception:
+                _dl_label, _dl_color = _due_s, "#64748b"
+            st.markdown(
+                f"""<div style="background:#fff;border-radius:8px;padding:0.55rem 0.85rem;
+                                margin-bottom:0.35rem;border:1px solid rgba(0,0,0,0.06);
+                                border-left:3px solid {_dl_color};
+                                display:flex;align-items:center;gap:0.75rem">
+                  <div style="flex:1;min-width:0">
+                    <p style="margin:0;font-size:0.84rem;font-weight:500;color:#1a1a2e">
+                      {t.get('title','Untitled task')}</p>
+                  </div>
+                  <span style="font-size:0.7rem;font-weight:600;color:{_dl_color};
+                               white-space:nowrap">{_dl_label}</span>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+    else:
+        st.markdown(
+            '<div style="background:#f0fdf4;border-radius:8px;padding:0.75rem 1rem;'
+            'border-left:3px solid #16a34a;color:#166534;font-size:0.85rem">'
+            '📅 No deadlines in the next 14 days.</div>',
+            unsafe_allow_html=True,
+        )
 
     st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
 
@@ -334,3 +376,37 @@ with right:
         col = col_a if i % 2 == 0 else col_b
         if col.button(label, key=key, use_container_width=True):
             st.switch_page(page)
+
+# ── Recent Activity ───────────────────────────────────────────────
+if recent_activity:
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+    st.markdown(
+        '<p style="font-size:0.78rem;font-weight:700;color:#1a2744;text-transform:uppercase;'
+        'letter-spacing:0.07em;margin-bottom:0.75rem">🕐 Recent Activity</p>',
+        unsafe_allow_html=True,
+    )
+    _ACT_ICONS = {
+        "CREATE": "✨", "UPDATE": "✏️", "DELETE": "🗑️",
+        "MATTER": "📁", "LOGIN": "🔐", "LOGOUT": "🚪",
+        "UPLOAD": "📤", "DOWNLOAD": "📥",
+    }
+    act_cols = st.columns(2, gap="small")
+    for i, a in enumerate(recent_activity):
+        _root_a = a.get("action", "").split("_")[0].upper()
+        _icon_a = _ACT_ICONS.get(_root_a, "•")
+        _ts_a   = str(a.get("created_at", ""))[:16].replace("T", " ")
+        _actor_a = a.get("actor_name", "System") or "System"
+        act_cols[i % 2].markdown(
+            f"""<div style="background:#fff;border-radius:8px;padding:0.5rem 0.75rem;
+                            margin-bottom:0.35rem;border:1px solid rgba(0,0,0,0.06);
+                            display:flex;align-items:center;gap:0.6rem">
+              <span style="font-size:0.9rem">{_icon_a}</span>
+              <div style="flex:1;min-width:0">
+                <p style="margin:0;font-size:0.78rem;font-weight:600;color:#1a2744;
+                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                  {a.get('action','')}</p>
+                <p style="margin:0;font-size:0.7rem;color:#9ca3af">{_actor_a} · {_ts_a}</p>
+              </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )

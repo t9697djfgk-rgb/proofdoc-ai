@@ -322,13 +322,139 @@ with tab_matters:
                     st.switch_page("pages/p_matter_discussion.py")
                 st.caption("Full discussion thread, internal notes, and file attachments are in the Discussion page.")
 
-            # AI / Drafts / Deadlines / Billing / Audit placeholders
-            for tab_obj, label, icon in zip(m_tabs[7:], ["AI Reviews","Drafts","Deadlines","Billing","Audit"], ["🔍","📝","⏰","💼","📋"]):
-                with tab_obj:
-                    st.markdown(
-                        f'<div class="empty-list">{icon} Use the <strong>{label}</strong> section '
-                        f'in the sidebar to work with this matter.</div>', unsafe_allow_html=True,
-                    )
+            # m_tabs[7] – AI Reviews
+            with m_tabs[7]:
+                st.markdown(
+                    '<div class="notice-box">🔍 AI Contract Review, clause risk analysis, and document editing '
+                    'suggestions are in the <b>AI Tools</b> section. Navigate there to run analysis on this matter.</div>',
+                    unsafe_allow_html=True,
+                )
+                _rc1, _rc2, _rc3 = st.columns(3)
+                if _rc1.button("🔍 AI Review", key=f"go_rev_{matter['id']}", use_container_width=True, type="primary"):
+                    st.switch_page("pages/p_ai_review.py")
+                if _rc2.button("📊 AI Analysis", key=f"go_an_{matter['id']}", use_container_width=True):
+                    st.switch_page("pages/p_ai_analysis.py")
+                if _rc3.button("🔬 Research", key=f"go_res_{matter['id']}", use_container_width=True):
+                    st.switch_page("pages/p_ai_research.py")
+
+            # m_tabs[8] – Drafts
+            with m_tabs[8]:
+                st.markdown(
+                    '<div class="notice-box">📝 Draft contracts, court documents, legal memos, and engagement '
+                    'letters via the <b>AI Tools → Draft</b> page.</div>',
+                    unsafe_allow_html=True,
+                )
+                _dc1, _dc2 = st.columns(2)
+                if _dc1.button("📝 Drafting Assistant", key=f"go_dr_{matter['id']}", use_container_width=True, type="primary"):
+                    st.switch_page("pages/p_ai_draft.py")
+                if _dc2.button("🧮 Calculators", key=f"go_calc_{matter['id']}", use_container_width=True):
+                    st.switch_page("pages/p_ai_calculators.py")
+
+            # m_tabs[9] – Deadlines
+            with m_tabs[9]:
+                import datetime as _dt2
+                _today2 = _dt2.date.today()
+                _tasks_dl = db.list_tasks(matter_id=matter["id"])
+                _with_due = [t for t in _tasks_dl
+                             if t.get("due_date") and t.get("status") not in ("completed", "cancelled")]
+                _with_due.sort(key=lambda t: str(t.get("due_date", "9999")))
+                if _with_due:
+                    for t in _with_due:
+                        _due2 = _dt2.date.fromisoformat(str(t["due_date"])[:10])
+                        _days2 = (_due2 - _today2).days
+                        if _days2 < 0:    _fg2, _bg2, _lbl2 = "#dc2626", "#fef2f2", "OVERDUE"
+                        elif _days2 == 0: _fg2, _bg2, _lbl2 = "#7c3aed", "#f5f3ff", "TODAY"
+                        elif _days2 <= 3: _fg2, _bg2, _lbl2 = "#d97706", "#fffbeb", f"{_days2}d"
+                        elif _days2 <= 14:_fg2, _bg2, _lbl2 = "#059669", "#f0fdf4", f"{_days2}d"
+                        else:             _fg2, _bg2, _lbl2 = "#64748b", "#f1f5f9", f"{_days2}d"
+                        _pri2_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(
+                            (t.get("priority") or "").lower(), "📌")
+                        st.markdown(
+                            f"""<div style="background:{_bg2};border-radius:8px;padding:.65rem 1rem;
+                                          margin-bottom:.35rem;border-left:3px solid {_fg2};
+                                          display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                              <span>{_pri2_icon}</span>
+                              <div style="flex:1;min-width:0">
+                                <p style="margin:0;font-size:.86rem;font-weight:600;color:#1a1a2e">{t.get('title','')}</p>
+                                <p style="margin:0;font-size:.74rem;color:#64748b">Due: {str(t['due_date'])[:10]}</p>
+                              </div>
+                              <span style="background:white;color:{_fg2};font-size:.72rem;font-weight:700;
+                                           padding:.25rem .6rem;border-radius:20px;border:1px solid {_fg2}">{_lbl2}</span>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.markdown('<div class="empty-list">⏰ No active deadlines for this matter.</div>',
+                                unsafe_allow_html=True)
+
+            # m_tabs[10] – Billing
+            with m_tabs[10]:
+                _entries2 = db.list_time_entries(matter["id"])
+                if _entries2:
+                    _total_h2   = sum(e["hours"] for e in _entries2)
+                    _total_val2 = sum(e["hours"] * (e.get("rate") or 0) for e in _entries2)
+                    _billed2    = sum(e["hours"] * (e.get("rate") or 0) for e in _entries2 if e.get("billed"))
+                    bc1, bc2, bc3 = st.columns(3)
+                    bc1.metric("Total Hours", f"{_total_h2:.1f} h")
+                    bc2.metric("Total Value",  f"£{_total_val2:,.0f}")
+                    bc3.metric("Unbilled",     f"£{_total_val2 - _billed2:,.0f}")
+                    st.divider()
+                    for e in _entries2[:20]:
+                        _bstat2 = "✅" if e.get("billed") else "🔵"
+                        st.markdown(
+                            f"""<div style="background:#f8fafc;border-radius:7px;padding:.5rem .9rem;
+                                          margin-bottom:.25rem;border-left:3px solid #c9a84c;
+                                          display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+                              <span style="font-size:.73rem;color:#9ca3af;white-space:nowrap">{str(e.get('entry_date',''))[:10]}</span>
+                              <span style="flex:1;font-size:.84rem;color:#1a2744">{e.get('description','—')}</span>
+                              <span style="font-size:.8rem;font-weight:600;color:#1a2744">{e['hours']:.1f}h</span>
+                              <span style="font-size:.78rem;color:#64748b">£{(e.get('rate') or 0):.0f}/hr</span>
+                              <span style="font-size:.8rem;font-weight:700;color:#c9a84c">£{e['hours']*(e.get('rate') or 0):,.0f}</span>
+                              <span>{_bstat2}</span>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+                    if st.button("💼 Full Billing & Invoicing →", key=f"bill_full_{matter['id']}"):
+                        st.switch_page("pages/p_billing.py")
+                else:
+                    st.markdown('<div class="empty-list">💼 No time entries yet for this matter.</div>',
+                                unsafe_allow_html=True)
+
+            # m_tabs[11] – Audit
+            with m_tabs[11]:
+                _uid_org2 = (st.session_state.get("user") or {}).get("organization_id")
+                try:
+                    _al2 = (db.get_db().table("audit_logs")
+                            .select("*").eq("organization_id", _uid_org2)
+                            .eq("resource_id", matter["id"])
+                            .order("created_at", desc=True).limit(50).execute()).data or []
+                except Exception:
+                    _al2 = []
+                if _al2:
+                    _AC2 = {
+                        "CREATE": ("#2563eb", "#eff6ff"), "UPDATE": ("#d97706", "#fffbeb"),
+                        "DELETE": ("#dc2626", "#fef2f2"), "MATTER": ("#1a2744", "#f0f4ff"),
+                    }
+                    for _l2 in _al2:
+                        _root2 = _l2.get("action", "").split("_")[0].upper()
+                        _fg3, _bg3 = _AC2.get(_root2, ("#1a2744", "#f1f5f9"))
+                        _ts2  = str(_l2.get("created_at", ""))[:16].replace("T", " ")
+                        _act2 = _l2.get("actor_name", "System") or "System"
+                        st.markdown(
+                            f"""<div style="background:{_bg3};border-radius:8px;padding:.5rem .9rem;
+                                          margin-bottom:.3rem;border-left:3px solid {_fg3};
+                                          display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+                              <span style="font-size:.68rem;font-weight:700;color:{_fg3};background:white;
+                                           padding:.15rem .45rem;border-radius:20px;
+                                           border:1px solid {_fg3};white-space:nowrap">{_l2.get('action','')}</span>
+                              <span style="font-size:.82rem;font-weight:600;color:#1a2744">{_act2}</span>
+                              <span style="margin-left:auto;font-size:.7rem;color:#94a3b8;white-space:nowrap">{_ts2}</span>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+                else:
+                    st.markdown('<div class="empty-list">📋 No audit entries recorded for this matter yet.</div>',
+                                unsafe_allow_html=True)
 
         if st.button("← Back to list"):
             st.session_state.selected_matter_id = None

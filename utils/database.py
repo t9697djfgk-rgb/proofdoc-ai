@@ -78,6 +78,18 @@ def create_matter(**kwargs) -> dict | None:
 def update_matter(matter_id: str, **kwargs) -> None:
     get_db().table("matters").update(kwargs).eq("id", matter_id).execute()
     audit("MATTER_UPDATED", "matter", matter_id, kwargs)
+    if "status" in kwargs:
+        try:
+            m = get_matter(matter_id)
+            if m:
+                notify_matter_members(
+                    matter_id, "matter_status_changed",
+                    f"Matter status: {kwargs['status']}",
+                    body=f"{m.get('ref', matter_id)}: {m.get('title', '')} → {kwargs['status']}",
+                    exclude_id=_uid(),
+                )
+        except Exception:
+            pass
 
 
 def delete_matter(matter_id: str) -> None:
@@ -303,7 +315,17 @@ def create_task(**kwargs) -> dict | None:
     if not org:
         return None
     resp = get_db().table("tasks").insert({"organization_id": org, "created_by": _uid(), **kwargs}).execute()
-    return (resp.data or [{}])[0]
+    task = (resp.data or [{}])[0]
+    assignee = kwargs.get("assigned_to")
+    if task.get("id") and assignee and assignee != _uid():
+        create_notification(
+            assignee, "task_assigned",
+            f"Task assigned: {kwargs.get('title', 'New task')}",
+            body=f"Due: {kwargs.get('due_date', '—')} · Priority: {kwargs.get('priority', '—')}",
+            matter_id=kwargs.get("matter_id"),
+            related_id=task["id"],
+        )
+    return task
 
 
 def update_task(task_id: str, **kwargs) -> None:
@@ -405,6 +427,18 @@ def create_notification(recipient_id: str, ntype: str, title: str,
         }).execute()
     except Exception:
         pass
+    try:
+        profile = get_db().table("profiles").select("email,full_name").eq("id", recipient_id).maybe_single().execute()
+        if profile.data and profile.data.get("email"):
+            from utils.email_utils import notify_user_email
+            notify_user_email(
+                to_email=profile.data["email"],
+                notification_type=ntype,
+                title=title,
+                body=body,
+            )
+    except Exception:
+        pass
 
 
 def notify_matter_members(matter_id: str, ntype: str, title: str, body: str = "",
@@ -429,16 +463,25 @@ def dashboard_stats() -> dict:
     clients  = db.table("clients").select("id", count="exact").eq("organization_id", org).eq("is_active", True).execute().count or 0
     pending  = db.table("tasks").select("id", count="exact").eq("organization_id", org).eq("status", "pending").execute().count or 0
     overdue  = db.table("tasks").select("id", count="exact").eq("organization_id", org).lt("due_date", today).neq("status", "completed").execute().count or 0
+    from datetime import timedelta
+    fortnight = str(date.today() + timedelta(days=14))
     recent   = (db.table("matters").select("*").eq("organization_id", org).order("created_at", desc=True).limit(5).execute()).data or []
-    od_tasks = (db.table("tasks").select("*").eq("organization_id", org).lt("due_date", today).neq("status", "completed").order("due_date").limit(10).execute()).data or []
+    od_tasks = (db.table("tasks").select("*").eq("organization_id", org).lt("due_date", today).neq("status", "completed").neq("status", "cancelled").order("due_date").limit(10).execute()).data or []
+    upcoming = (db.table("tasks").select("*").eq("organization_id", org).gte("due_date", today).lte("due_date", fortnight).neq("status", "completed").neq("status", "cancelled").order("due_date").limit(8).execute()).data or []
+    activity = []
+    try:
+        activity = (db.table("audit_logs").select("*").eq("organization_id", org).order("created_at", desc=True).limit(8).execute()).data or []
+    except Exception:
+        pass
     return {
         "active_matters": active,
         "total_clients": clients,
         "pending_tasks": pending,
         "overdue_tasks": overdue,
-        "upcoming_deadlines": overdue,
         "recent_matters": recent,
         "overdue_task_list": od_tasks,
+        "upcoming_tasks": upcoming,
+        "recent_activity": activity,
     }
 
 

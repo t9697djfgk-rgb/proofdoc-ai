@@ -338,7 +338,182 @@ with tab6:
     if "templates" not in st.session_state:
         st.session_state.templates = []
 
-    t_tab_view, t_tab_create = st.tabs(["📚 My Templates", "➕ Create Template"])
+    _GALLERY = [
+        {
+            "name": "Non-Disclosure Agreement (NDA)",
+            "category": "Agreement", "jurisdiction": "UK",
+            "body": """NON-DISCLOSURE AGREEMENT
+
+THIS AGREEMENT is made on {{DATE}} between:
+
+1. {{DISCLOSING_PARTY}} ("Disclosing Party"), and
+2. {{RECEIVING_PARTY}} ("Receiving Party").
+
+BACKGROUND
+The Disclosing Party wishes to disclose certain Confidential Information to the Receiving Party for the purpose of {{PURPOSE}}.
+
+1. DEFINITION OF CONFIDENTIAL INFORMATION
+"Confidential Information" means any information disclosed by the Disclosing Party, whether orally, in writing, or otherwise, that is designated as confidential.
+
+2. OBLIGATIONS
+The Receiving Party shall:
+(a) Keep the Confidential Information strictly confidential;
+(b) Not disclose the Confidential Information to any third party without prior written consent;
+(c) Use the Confidential Information solely for the Purpose.
+
+3. TERM
+This Agreement shall remain in force for {{DURATION}} from the date of this Agreement.
+
+4. GOVERNING LAW
+This Agreement shall be governed by the laws of {{JURISDICTION}}.
+
+Signed by {{DISCLOSING_PARTY}}: _________________________ Date: __________
+Signed by {{RECEIVING_PARTY}}: _________________________ Date: __________""",
+            "notes": "Fill in: DATE, DISCLOSING_PARTY, RECEIVING_PARTY, PURPOSE, DURATION, JURISDICTION",
+        },
+        {
+            "name": "Client Engagement Letter",
+            "category": "Legal Letter", "jurisdiction": "International",
+            "body": """ENGAGEMENT LETTER
+
+{{DATE}}
+
+{{CLIENT_NAME}}
+{{CLIENT_ADDRESS}}
+
+Dear {{CLIENT_NAME}},
+
+Re: {{MATTER_DESCRIPTION}}
+
+We are pleased to confirm our engagement to act on your behalf in connection with the above matter.
+
+SCOPE OF SERVICES
+We will provide the following legal services: {{SCOPE_OF_SERVICES}}
+
+FEE ARRANGEMENT
+Our fees for this matter will be: {{FEE_ARRANGEMENT}}
+
+BILLING
+Invoices will be rendered {{BILLING_FREQUENCY}} and are payable within 30 days of receipt.
+
+CONFIDENTIALITY
+We confirm that all information you provide will be kept strictly confidential.
+
+ACCEPTANCE
+Please sign and return one copy of this letter to confirm your instructions.
+
+Yours sincerely,
+
+{{LAWYER_NAME}}
+{{FIRM_NAME}}""",
+            "notes": "Fill in: DATE, CLIENT_NAME, CLIENT_ADDRESS, MATTER_DESCRIPTION, SCOPE_OF_SERVICES, FEE_ARRANGEMENT, BILLING_FREQUENCY, LAWYER_NAME, FIRM_NAME",
+        },
+        {
+            "name": "Demand Letter",
+            "category": "Legal Letter", "jurisdiction": "International",
+            "body": """WITHOUT PREJUDICE
+
+{{DATE}}
+
+{{RECIPIENT_NAME}}
+{{RECIPIENT_ADDRESS}}
+
+Dear {{RECIPIENT_NAME}},
+
+Re: {{MATTER_REFERENCE}} — FORMAL DEMAND
+
+We act on behalf of {{CLIENT_NAME}} ("our client") in connection with the above matter.
+
+BACKGROUND
+{{BACKGROUND_FACTS}}
+
+DEMAND
+We hereby formally demand that you:
+1. {{DEMAND_1}}
+2. {{DEMAND_2}}
+
+DEADLINE
+Unless we receive your written response and compliance by {{RESPONSE_DEADLINE}}, our client reserves all rights to commence legal proceedings without further notice.
+
+Take this letter seriously. The costs of litigation, including our client's legal costs, may be awarded against you.
+
+Yours faithfully,
+
+{{LAWYER_NAME}}
+{{FIRM_NAME}}
+Solicitors for {{CLIENT_NAME}}""",
+            "notes": "Fill in: DATE, RECIPIENT_NAME, RECIPIENT_ADDRESS, MATTER_REFERENCE, CLIENT_NAME, BACKGROUND_FACTS, DEMAND_1, DEMAND_2, RESPONSE_DEADLINE, LAWYER_NAME, FIRM_NAME",
+        },
+        {
+            "name": "Settlement Agreement",
+            "category": "Agreement", "jurisdiction": "International",
+            "body": """SETTLEMENT AGREEMENT
+
+THIS SETTLEMENT AGREEMENT is made on {{DATE}} between:
+
+1. {{CLAIMANT_NAME}} ("Claimant"), and
+2. {{RESPONDENT_NAME}} ("Respondent").
+
+RECITALS
+A. The Claimant has made claims against the Respondent arising from {{DISPUTE_DESCRIPTION}}.
+B. The parties wish to resolve this dispute on the terms set out below.
+
+TERMS OF SETTLEMENT
+1. SETTLEMENT SUM: The Respondent shall pay the Claimant the sum of {{SETTLEMENT_AMOUNT}} ("Settlement Sum").
+2. PAYMENT: Payment shall be made by {{PAYMENT_DEADLINE}} to {{PAYMENT_DETAILS}}.
+3. FULL AND FINAL SETTLEMENT: Upon receipt of the Settlement Sum, the Claimant agrees that this constitutes full and final settlement of all claims.
+4. CONFIDENTIALITY: The parties agree to keep the terms of this Agreement strictly confidential.
+5. GOVERNING LAW: This Agreement is governed by the laws of {{JURISDICTION}}.
+
+Signed: {{CLAIMANT_NAME}} _________________________ Date: __________
+Signed: {{RESPONDENT_NAME}} _______________________ Date: __________""",
+            "notes": "Fill in: DATE, CLAIMANT_NAME, RESPONDENT_NAME, DISPUTE_DESCRIPTION, SETTLEMENT_AMOUNT, PAYMENT_DEADLINE, PAYMENT_DETAILS, JURISDICTION",
+        },
+        {
+            "name": "Witness Statement",
+            "category": "Court Document", "jurisdiction": "UK",
+            "body": """WITNESS STATEMENT
+
+Case No: {{CASE_NUMBER}}
+Statement of: {{WITNESS_NAME}}
+Date: {{DATE}}
+
+I, {{WITNESS_NAME}}, of {{WITNESS_ADDRESS}}, make this statement on the basis of my personal knowledge and belief:
+
+1. I am the {{WITNESS_ROLE}} in this matter.
+
+2. {{STATEMENT_PARAGRAPH_1}}
+
+3. {{STATEMENT_PARAGRAPH_2}}
+
+4. {{STATEMENT_PARAGRAPH_3}}
+
+STATEMENT OF TRUTH
+I believe that the facts stated in this witness statement are true.
+
+Signed: _________________________ Date: __________
+Full Name: {{WITNESS_NAME}}""",
+            "notes": "Fill in: CASE_NUMBER, WITNESS_NAME, DATE, WITNESS_ADDRESS, WITNESS_ROLE, STATEMENT_PARAGRAPH_1, STATEMENT_PARAGRAPH_2, STATEMENT_PARAGRAPH_3",
+        },
+    ]
+
+    t_tab_gallery, t_tab_view, t_tab_create = st.tabs(["⚡ Template Gallery", "📚 My Templates", "➕ Create Template"])
+
+    with t_tab_gallery:
+        st.markdown("Pre-built templates — click **Use Template** to load it into your session and fill in the placeholders.")
+        for _tpl in _GALLERY:
+            with st.expander(f"**{_tpl['name']}** · {_tpl['category']} · {_tpl['jurisdiction']}"):
+                st.text_area("Preview", value=_tpl["body"][:400] + ("…" if len(_tpl["body"]) > 400 else ""),
+                              height=120, disabled=True, key=f"gal_prev_{_tpl['name']}")
+                if _tpl.get("notes"):
+                    st.caption(f"Placeholders: {_tpl['notes']}")
+                if st.button("📥 Use Template", key=f"gal_use_{_tpl['name']}", type="primary"):
+                    if not any(t["name"] == _tpl["name"] for t in st.session_state.templates):
+                        st.session_state.templates.append(_tpl.copy())
+                        st.success(f"✅ '{_tpl['name']}' added to My Templates.")
+                        st.rerun()
+                    else:
+                        st.info("Already in My Templates.")
 
     with t_tab_create:
         with st.form("new_template", clear_on_submit=True):

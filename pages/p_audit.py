@@ -124,13 +124,47 @@ with tab_activity:
                 st.code(json.dumps(meta, indent=2), language="json")
 
         st.markdown("<br>", unsafe_allow_html=True)
+
+        # Build text version for PDF/CSV
+        def _log_to_text(entries):
+            lines = ["AUDIT LOG EXPORT", "=" * 60]
+            for l in entries:
+                ts     = str(l.get("created_at",""))[:16].replace("T"," ")
+                actor  = l.get("actor_name","System") or "System"
+                action = l.get("action","")
+                rtype  = l.get("resource_type","") or ""
+                lines.append(f"{ts}  |  {actor:<25}  |  {action:<30}  |  {rtype}")
+            return "\n".join(lines)
+
+        def _log_to_csv(entries):
+            import io, csv
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(["timestamp","actor","action","resource_type","resource_id"])
+            for l in entries:
+                w.writerow([
+                    str(l.get("created_at",""))[:16].replace("T"," "),
+                    l.get("actor_name",""),
+                    l.get("action",""),
+                    l.get("resource_type",""),
+                    l.get("resource_id",""),
+                ])
+            return buf.getvalue()
+
         dl_data = json.dumps(shown, indent=2, default=str)
-        st.download_button(
-            "📥 Export Filtered Log (JSON)",
-            dl_data,
-            "audit_log.json",
-            "application/json",
+        _ex1, _ex2, _ex3 = st.columns(3)
+        _ex1.download_button(
+            "📥 Export JSON", dl_data, "audit_log.json", "application/json",
+            use_container_width=True, key="al_dl_json",
         )
+        _ex2.download_button(
+            "📊 Export CSV", _log_to_csv(shown), "audit_log.csv", "text/csv",
+            use_container_width=True, key="al_dl_csv",
+        )
+        with _ex3:
+            from utils.shared.export_utils import download_pdf
+            download_pdf("📄 Export PDF", _log_to_text(shown), "audit_log.pdf",
+                         title="Audit Log Export", key="al_dl_pdf")
     else:
         st.info("No audit log entries yet. Activity is recorded as users interact with the platform.")
 

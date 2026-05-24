@@ -94,44 +94,53 @@ def render_sidebar(tool_name: str = "") -> str | None:
 def _render_search_results(query: str) -> None:
     from utils import database as db
     q = query.lower()
-    results = []
+    matter_hits, client_hits, doc_hits = [], [], []
 
     try:
-        for m in db.list_matters()[:50]:
-            if q in (m.get("title") or "").lower() or q in (m.get("reference_number") or "").lower():
-                results.append(("📁", m.get("title", "Untitled"), m.get("reference_number", ""), "Matter"))
+        for m in db.list_matters()[:60]:
+            if q in (m.get("title") or "").lower() or q in (m.get("ref") or "").lower():
+                matter_hits.append(m)
     except Exception:
         pass
 
     try:
-        for c in db.list_clients()[:50]:
+        for c in db.list_clients()[:60]:
             name = c.get("name") or c.get("company_name") or ""
             if q in name.lower():
-                results.append(("🏢", name, c.get("email", ""), "Client"))
+                client_hits.append(c)
     except Exception:
         pass
 
     try:
-        for d in db.list_documents()[:50]:
-            if q in (d.get("file_name") or "").lower() or q in (d.get("title") or "").lower():
-                results.append(("📄", d.get("title") or d.get("file_name", ""), "", "Document"))
+        for d in db.list_documents()[:60]:
+            if q in (d.get("name") or "").lower() or q in (d.get("file_name") or "").lower():
+                doc_hits.append(d)
     except Exception:
         pass
 
-    if results:
-        for icon, title, sub, kind in results[:6]:
-            st.markdown(
-                f"<div style='padding:0.3rem 0.4rem;border-radius:5px;background:rgba(26,39,68,0.04);"
-                f"margin-bottom:0.2rem;font-size:0.78rem'>"
-                f"{icon} <b>{title}</b>"
-                f"{'<br><span style=\"color:#6b7280\">' + sub + '</span>' if sub else ''}"
-                f" <span style='float:right;color:#9ca3af;font-size:0.7rem'>{kind}</span></div>",
-                unsafe_allow_html=True,
-            )
-        if len(results) > 6:
-            st.caption(f"+{len(results)-6} more results")
-    else:
+    total = len(matter_hits) + len(client_hits) + len(doc_hits)
+    if total == 0:
         st.caption("No matches found.")
+        return
+
+    for m in matter_hits[:3]:
+        label = f"📁 {m.get('ref','')} {(m.get('title') or '')[:22]}"
+        if st.button(label, key=f"srch_m_{m['id']}", use_container_width=True):
+            st.session_state.selected_matter_id = m["id"]
+            st.switch_page("pages/p_matters_list.py")
+
+    for c in client_hits[:2]:
+        label = f"🏢 {(c.get('name') or c.get('company_name') or '')[:28]}"
+        if st.button(label, key=f"srch_c_{c['id']}", use_container_width=True):
+            st.switch_page("pages/p_matters_list.py")
+
+    for d in doc_hits[:2]:
+        label = f"📄 {(d.get('name') or d.get('file_name') or '')[:28]}"
+        if st.button(label, key=f"srch_d_{d['id']}", use_container_width=True):
+            st.switch_page("pages/p_doc_library.py")
+
+    if total > 7:
+        st.caption(f"+{total - 7} more results")
 
 
 def setup_page(section: str = "") -> str | None:

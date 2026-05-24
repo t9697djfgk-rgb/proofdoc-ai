@@ -15,8 +15,8 @@ inject_css()
 first_name = user["full_name"].split()[0]
 slim_header("🏢", f"Welcome, {first_name}", f"{user['organization_name']} · Client Portal")
 
-tab_home, tab_matters, tab_docs, tab_disc, tab_profile = st.tabs([
-    "🏠 Overview", "📁 My Matters", "📄 Documents", "💬 Discussions", "👤 Profile",
+tab_home, tab_matters, tab_docs, tab_disc, tab_billing, tab_profile = st.tabs([
+    "🏠 Overview", "📁 My Matters", "📄 Documents", "💬 Discussions", "💼 Billing", "👤 Profile",
 ])
 
 # ══════════════════════════════════════════════════════════════════
@@ -291,7 +291,68 @@ with tab_disc:
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════════
-# TAB 5 – PROFILE
+# TAB 5 – BILLING (read-only)
+# ══════════════════════════════════════════════════════════════════
+with tab_billing:
+    section("💼 Billing Summary")
+    st.markdown(
+        '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;'
+        'padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.85rem">'
+        'ℹ️ This shows time recorded against your matters. For invoices or billing queries, '
+        'please contact your lawyer.</div>',
+        unsafe_allow_html=True,
+    )
+    matters_b = db.list_matters()
+    if matters_b:
+        _all_entries = []
+        for _m in matters_b:
+            _es = db.list_time_entries(matter_id=_m["id"])
+            for _e in _es:
+                _e["_matter_title"] = _m.get("title", "—")
+                _e["_matter_ref"]   = _m.get("ref", "")
+            _all_entries.extend(_es)
+
+        if _all_entries:
+            _t_hrs = sum(e["hours"] for e in _all_entries)
+            _t_val = sum(e["hours"] * (e.get("rate") or 0) for e in _all_entries)
+            _billed_val = sum(e["hours"] * (e.get("rate") or 0)
+                              for e in _all_entries if e.get("billed"))
+            bc1, bc2, bc3 = st.columns(3)
+            bc1.metric("Total Hours Recorded", f"{_t_hrs:.1f} h")
+            bc2.metric("Total Fees",            f"£{_t_val:,.0f}")
+            bc3.metric("Invoiced",              f"£{_billed_val:,.0f}")
+
+            st.divider()
+            for _m in matters_b:
+                _m_entries = [e for e in _all_entries if e.get("_matter_ref") == _m.get("ref")]
+                if not _m_entries:
+                    continue
+                _m_hrs = sum(e["hours"] for e in _m_entries)
+                _m_val = sum(e["hours"] * (e.get("rate") or 0) for e in _m_entries)
+                with st.expander(
+                    f"📁 {_m.get('ref','')} — {_m.get('title','')[:40]}  ·  "
+                    f"{_m_hrs:.1f}h  ·  £{_m_val:,.0f}"
+                ):
+                    for e in _m_entries:
+                        st.markdown(
+                            f"""<div style="background:#f8fafc;border-radius:6px;padding:.45rem .8rem;
+                                          margin-bottom:.2rem;border-left:3px solid #c9a84c;
+                                          display:flex;align-items:center;gap:.75rem;font-size:.82rem">
+                              <span style="color:#9ca3af;white-space:nowrap">{str(e.get('entry_date',''))[:10]}</span>
+                              <span style="flex:1;color:#374151">{e.get('description','—')}</span>
+                              <span style="font-weight:600;color:#1a2744">{e['hours']:.1f}h</span>
+                              <span style="color:#c9a84c;font-weight:700">£{e['hours']*(e.get('rate') or 0):,.0f}</span>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+        else:
+            st.info("No time entries recorded for your matters yet.")
+    else:
+        st.info("No matters assigned yet.")
+
+
+# ══════════════════════════════════════════════════════════════════
+# TAB 6 – PROFILE
 # ══════════════════════════════════════════════════════════════════
 with tab_profile:
     profile = db.get_profile(user["id"]) or {}
