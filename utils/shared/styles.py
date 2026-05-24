@@ -124,45 +124,18 @@ html, body, [class*="css"] {
 }
 
 /* ═══════════════════════════════════════════════════
-   SIDEBAR TOGGLE BUTTON
+   SIDEBAR — always visible, hide all collapse controls
 ═══════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════
-   SIDEBAR TOGGLE BUTTON — prominent hamburger
-═══════════════════════════════════════════════════ */
+/* Hide the "expand" button shown when sidebar is collapsed */
 [data-testid="collapsedControl"] {
-    position: fixed !important;
-    top: 0.9rem !important;
-    left: 0.9rem !important;
-    transform: none !important;
-    width: 44px !important;
-    height: 44px !important;
-    background: linear-gradient(135deg, #1a2744 0%, #253461 100%) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 16px rgba(26,39,68,0.35) !important;
-    cursor: pointer !important;
-    z-index: 9999 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border: none !important;
-    outline: none !important;
-    transition: all 0.2s ease !important;
-}
-[data-testid="collapsedControl"]:hover {
-    background: linear-gradient(135deg, #c9a84c 0%, #e8c97a 100%) !important;
-    box-shadow: 0 6px 22px rgba(201,168,76,0.45) !important;
-    transform: scale(1.08) !important;
-    width: 44px !important;
-}
-[data-testid="collapsedControl"] svg {
     display: none !important;
 }
-[data-testid="collapsedControl"]::after {
-    content: "☰" !important;
-    color: #ffffff !important;
-    font-size: 1.25rem !important;
-    line-height: 1 !important;
-    display: block !important;
+/* Hide the collapse arrow inside the expanded sidebar */
+[data-testid="stSidebarCollapseButton"],
+button[kind="icon"][data-testid="stBaseButton-icon"],
+[data-testid="stSidebar"] button[aria-label="Close sidebar"],
+[data-testid="stSidebar"] button[aria-label="Collapse sidebar"] {
+    display: none !important;
 }
 
 /* ═══════════════════════════════════════════════════
