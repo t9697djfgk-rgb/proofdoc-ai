@@ -1,10 +1,11 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, placeholder_feature, group_header, section
+from utils.shared.styles import slim_header, inject_css, group_header, section
+inject_css()
 from utils.auth import require_lawyer
 from utils import database as db
 
-setup_page()
+api_key = setup_page()
 require_lawyer()
 
 slim_header("📁", "Matters", "Manage clients, matters, and engagement workflow")
@@ -86,20 +87,42 @@ with tab_matters:
             and (not search_filter or search_filter.lower() in m["title"].lower()
                  or search_filter.lower() in m.get("ref", "").lower())
         ]
-        h = st.columns([1, 3, 1.5, 1, 1.5, 1])
-        for col, lbl in zip(h, ["Ref", "Title", "Type", "Status", "Jurisdiction", "Action"]):
-            col.markdown(f"**{lbl}**")
-        st.divider()
-        STATUS_ICON = {"Active": "🟢", "Closed": "🔴", "On Hold": "🟡", "Archived": "⚫"}
+        STATUS_CFG = {
+            "Active":   ("#16a34a", "#dcfce7"),
+            "On Hold":  ("#d97706", "#fef9c3"),
+            "Closed":   ("#64748b", "#f1f5f9"),
+            "Archived": ("#94a3b8", "#f8fafc"),
+        }
         for m in visible:
-            row = st.columns([1, 3, 1.5, 1, 1.5, 1])
-            row[0].text(m.get("ref", ""))
-            row[1].text(m["title"])
-            row[2].text(m.get("matter_type") or "—")
-            s = m.get("status", "")
-            row[3].text(f"{STATUS_ICON.get(s,'⚪')} {s}")
-            row[4].text(m.get("jurisdiction") or "—")
-            if row[5].button("Open", key=f"open_{m['id']}", use_container_width=True):
+            status = m.get("status", "Active")
+            fg, bg = STATUS_CFG.get(status, ("#64748b", "#f1f5f9"))
+            ref    = m.get("ref", "—")
+            title  = (m.get("title") or "Untitled")
+            mtype  = m.get("matter_type") or "—"
+            juris  = m.get("jurisdiction") or "—"
+            updated = str(m.get("updated_at", m.get("created_at", "")))[:10]
+            card_col, btn_col = st.columns([9, 1])
+            card_col.markdown(
+                f"""
+                <div style="background:#fff;border-radius:10px;padding:0.75rem 1rem;
+                            border:1px solid rgba(0,0,0,0.07);
+                            border-left:4px solid {fg};
+                            box-shadow:0 1px 4px rgba(0,0,0,0.05);margin-bottom:0.1rem">
+                  <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                    <span style="font-weight:700;color:#1a2744;font-size:0.88rem">{ref}</span>
+                    <span style="font-size:0.88rem;color:#374151">{title[:60]}</span>
+                    <span style="background:{bg};color:{fg};font-size:0.7rem;font-weight:600;
+                                 padding:0.15rem 0.5rem;border-radius:20px;margin-left:auto">
+                      {status}</span>
+                  </div>
+                  <div style="margin-top:0.3rem;display:flex;gap:1.2rem;font-size:0.75rem;color:#9ca3af;flex-wrap:wrap">
+                    <span>📂 {mtype}</span><span>🌍 {juris}</span><span>🕐 {updated}</span>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if btn_col.button("Open →", key=f"open_{m['id']}", use_container_width=True):
                 st.session_state.selected_matter_id = m["id"]
                 st.rerun()
         st.caption(f"{len(visible)} of {len(matters)} matters shown")
@@ -399,10 +422,75 @@ with tab_conflict:
 
 # ── ENGAGEMENT LETTERS ─────────────────────────────────────────────
 with tab_engagement:
-    placeholder_feature(
-        "📜", "Engagement Letters",
-        "Generate and manage client engagement letters for new matters.",
-        ["Draft engagement letters from matter details", "Include scope, fees, and terms",
-         "Send for e-signature", "Log signed versions in matter"],
-        ["Engagement letter draft (Word/PDF)", "Signed copy stored in matter"],
+    # api_key already set at top of page
+
+    section("📜 Generate Engagement Letter")
+    st.markdown(
+        '<div class="notice-box">ℹ️ Select a matter and fill in the fee details. '
+        "Claude will draft a professional engagement letter ready for review and signature.</div>",
+        unsafe_allow_html=True,
     )
+
+    matters_for_eng = db.list_matters()
+    if not matters_for_eng:
+        st.info("Create a matter first.")
+    else:
+        eng_opts = {f"{m.get('ref','')} – {m['title'][:45]}": m for m in matters_for_eng}
+        eng_sel  = st.selectbox("Select matter", list(eng_opts.keys()), key="eng_matter")
+        eng_m    = eng_opts[eng_sel]
+
+        c1, c2, c3 = st.columns(3)
+        eng_fee_type = c1.selectbox("Fee arrangement", [
+            "Fixed fee", "Hourly rate", "Retainer", "Conditional fee", "Damages-based agreement", "Pro bono",
+        ], key="eng_fee_type")
+        eng_amount   = c2.text_input("Fee amount / rate", placeholder="e.g. £5,000 or £250/hr", key="eng_amt")
+        eng_currency = c3.selectbox("Currency", ["RWF", "USD", "GBP", "EUR"], key="eng_cur")
+        eng_scope    = st.text_area("Scope of services", height=80,
+                                     placeholder="Describe the legal services to be provided…", key="eng_scope")
+        eng_terms    = st.text_area("Special terms / exclusions (optional)", height=60, key="eng_terms")
+        eng_law      = st.selectbox("Governing law", ["Rwanda", "England & Wales", "New York", "Other"], key="eng_law")
+
+        if st.button("📜 Generate Engagement Letter", type="primary",
+                     disabled=not api_key or not eng_scope.strip(), key="eng_gen"):
+            from utils.drafting_assistant import DraftingAssistant
+            with st.spinner("Drafting engagement letter with Claude Opus 4.7…"):
+                try:
+                    result = DraftingAssistant(api_key).draft(
+                        doc_type="Client Engagement Letter",
+                        jurisdiction=eng_law,
+                        legal_style="Professional law firm correspondence",
+                        parties=f"Law firm: {st.session_state['user']['organization_name']} | Client: {eng_m['title']}",
+                        key_facts=(
+                            f"Matter: {eng_m.get('ref','')} – {eng_m['title']}\n"
+                            f"Matter type: {eng_m.get('matter_type','')}\n"
+                            f"Fee arrangement: {eng_fee_type}, {eng_amount} {eng_currency}\n"
+                            f"Scope: {eng_scope}"
+                        ),
+                        tone="Professional and formal",
+                        additional=eng_terms or "Standard terms apply.",
+                    )
+                    st.session_state["eng_result"] = result
+                except Exception as exc:
+                    st.error(f"Generation failed: {exc}")
+
+        if st.session_state.get("eng_result"):
+            res = st.session_state.eng_result
+            letter = res.get("draft_document", "")
+            st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+            section("📄 Draft Engagement Letter")
+            st.markdown(
+                f'<div class="revised-doc">{letter.replace(chr(10), "<br>")}</div>',
+                unsafe_allow_html=True,
+            )
+            if res.get("missing_information"):
+                with st.expander("⚠️ Missing information — complete before sending"):
+                    for item in res["missing_information"]:
+                        st.warning(item)
+            st.download_button(
+                "⬇️ Download (.txt)", data=letter,
+                file_name=f"engagement_letter_{eng_m.get('ref','matter')}.txt",
+                mime="text/plain", key="dl_eng",
+            )
+            if st.button("🗑️ Clear", key="eng_clear"):
+                del st.session_state["eng_result"]
+                st.rerun()

@@ -1,14 +1,37 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, section
+from utils.shared.styles import slim_header, inject_css, section
 from utils.auth import require_admin
 import utils.database as db
 from utils import rwanda_laws as rl
 
 setup_page()
 user = require_admin()
+inject_css()
 
 slim_header("🛡️", "Admin Panel", f"{user['organization_name']} — user management, law database, audit")
+
+# ── Stats banner ──────────────────────────────────────────────────
+stats = db.dashboard_stats()
+all_profiles = db.list_profiles(active_only=False)
+active_users = sum(1 for p in all_profiles if p.get("is_active"))
+s1, s2, s3, s4 = st.columns(4)
+for col, icon, label, value, color, bg in [
+    (s1, "👥", "Team Members",  active_users,                         "#1a2744", "#e8f0fe"),
+    (s2, "⚖️", "Active Matters", stats.get("active_matters", 0),      "#059669", "#ecfdf5"),
+    (s3, "🏢", "Clients",        stats.get("total_clients", 0),        "#d97706", "#fffbeb"),
+    (s4, "📋", "Pending Tasks",  stats.get("pending_tasks", 0),        "#7c3aed", "#f5f3ff"),
+]:
+    col.markdown(
+        f"""<div style="background:{bg};border-radius:12px;padding:0.9rem 1rem;
+                        border-left:4px solid {color}">
+          <p style="margin:0;font-size:0.72rem;font-weight:600;color:#6b7280;
+                    text-transform:uppercase;letter-spacing:.05em">{icon} {label}</p>
+          <p style="margin:0.2rem 0 0;font-size:1.8rem;font-weight:700;color:{color}">{value}</p>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
 tab_users, tab_org, tab_laws, tab_audit = st.tabs([
     "👥 Users", "🏢 Organisation", "📚 Rwanda Laws", "📋 Audit Log",
@@ -17,23 +40,53 @@ tab_users, tab_org, tab_laws, tab_audit = st.tabs([
 # ── Users ─────────────────────────────────────────────────────────
 with tab_users:
     section("👥 Team Members")
-    profiles = db.list_profiles(active_only=False)
+    profiles = all_profiles  # loaded above for stats
     ROLE_ICONS = {"admin": "🛡️", "lawyer": "⚖️", "staff": "👤", "client": "🏢", "intern": "🎓"}
 
     if profiles:
-        h = st.columns([3, 2, 2, 2, 1])
-        for col, lbl in zip(h, ["Name", "Email", "Role", "Title", "Active"]):
-            col.markdown(f"**{lbl}**")
-        st.divider()
         for p in profiles:
             if p["id"] == user["id"]:
                 continue
-            r = st.columns([3, 2, 2, 2, 1])
-            r[0].text(p.get("full_name", ""))
-            r[1].text(p.get("email", ""))
-            r[2].text(f"{ROLE_ICONS.get(p['role'],'👤')} {p['role'].title()}")
-            r[3].text(p.get("title", "—") or "—")
-            r[4].text("✅" if p.get("is_active") else "❌")
+            is_active = p.get("is_active", True)
+            role      = p.get("role", "staff")
+            bg        = "#fff" if is_active else "#fafafa"
+            border    = "rgba(0,0,0,0.07)" if is_active else "#e5e7eb"
+            c_main, c_role, c_actions = st.columns([4, 2, 2])
+            c_main.markdown(
+                f"""<div style="background:{bg};border-radius:10px;padding:0.75rem 1rem;
+                               border:1px solid {border};box-shadow:0 1px 4px rgba(0,0,0,0.04)">
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <span style="font-size:1.3rem">{ROLE_ICONS.get(role,'👤')}</span>
+                    <div>
+                      <p style="margin:0;font-weight:600;color:#1a2744;font-size:0.88rem">
+                        {p.get('full_name','')}</p>
+                      <p style="margin:0;font-size:0.75rem;color:#6b7280">{p.get('email','')}</p>
+                      {'<p style="margin:0;font-size:0.72rem;color:#9ca3af">'+p.get('title','')+'</p>' if p.get('title') else ''}
+                    </div>
+                    <span style="margin-left:auto;font-size:0.7rem;font-weight:600;
+                                 background:{'#dcfce7' if is_active else '#f1f5f9'};
+                                 color:{'#16a34a' if is_active else '#94a3b8'};
+                                 padding:0.15rem 0.5rem;border-radius:20px">
+                      {'Active' if is_active else 'Inactive'}</span>
+                  </div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            ROLES = ["admin", "lawyer", "staff", "intern", "client"]
+            new_role = c_role.selectbox(
+                "Role", ROLES, index=ROLES.index(role) if role in ROLES else 1,
+                key=f"role_{p['id']}", label_visibility="collapsed",
+            )
+            if new_role != role:
+                db.get_db().table("profiles").update({"role": new_role}).eq("id", p["id"]).execute()
+                st.rerun()
+            ba, bb = c_actions.columns(2)
+            if ba.button("Deactivate" if is_active else "Reactivate",
+                         key=f"tog_{p['id']}", use_container_width=True):
+                from utils.auth import deactivate_user
+                deactivate_user(p["id"])
+                st.rerun()
+            st.markdown("<div style='height:0.25rem'></div>", unsafe_allow_html=True)
     else:
         st.caption("No team members yet.")
 
@@ -66,25 +119,22 @@ with tab_users:
                 else:
                     st.error(f"❌ {result['error']}")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    section("⚡ Manage Users")
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+    section("🔑 Reset User Password")
     all_p = [p for p in profiles if p["id"] != user["id"]]
     if all_p:
         opts = {f"{p['full_name']} ({p['email']})": p for p in all_p}
-        sel = st.selectbox("Select user", list(opts.keys()), key="mgmt_sel")
-        sel_p = opts[sel]
-        c1, c2, c3 = st.columns(3)
-        if c1.button("Deactivate" if sel_p.get("is_active") else "Reactivate", key="mgmt_toggle"):
-            from utils.auth import deactivate_user
-            deactivate_user(sel_p["id"])
-            st.rerun()
-        new_reset_pw = c2.text_input("Reset password to", type="password", key="mgmt_reset_pw")
-        if c3.button("Reset Password", key="mgmt_reset_btn") and new_reset_pw:
+        c1, c2, c3 = st.columns([3, 2, 1])
+        sel   = c1.selectbox("Select user", list(opts.keys()), key="mgmt_sel",
+                              label_visibility="collapsed")
+        new_reset_pw = c2.text_input("New password", type="password", key="mgmt_reset_pw",
+                                     label_visibility="collapsed", placeholder="New password (min 8 chars)")
+        if c3.button("Reset", key="mgmt_reset_btn", use_container_width=True) and new_reset_pw:
             if len(new_reset_pw) < 8:
                 st.warning("Min 8 characters.")
             else:
                 from utils.auth import reset_password
-                r = reset_password(sel_p["id"], new_reset_pw)
+                r = reset_password(opts[sel]["id"], new_reset_pw)
                 if r["ok"]:
                     st.success("✅ Password reset.")
                 else:
