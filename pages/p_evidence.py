@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, disclaimer, confidentiality_notice, section, placeholder_feature
+from utils.shared.styles import slim_header, disclaimer, confidentiality_notice, section
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import download_json
 
@@ -17,7 +17,7 @@ tab1, tab2, tab3 = st.tabs([
     "❓ Cross-Examination Questions",
 ])
 
-# ── 1. Evidence Analyzer (functional) ────────────────────────────
+# ── 1. Evidence Analyzer ─────────────────────────────────────────
 with tab1:
     st.markdown("Analyse witness statements and evidence for strengths, weaknesses, contradictions, and gaps.")
     text1 = document_input_ui("ea", paste_placeholder="Paste witness statement or evidence summary here…")
@@ -42,43 +42,80 @@ with tab1:
                     st.success("✅ Analysis complete!")
                 except Exception as exc:
                     st.error(f"Analysis failed: {exc}")
+
     if st.session_state.get("ea_result"):
         result1 = st.session_state.ea_result
         st.divider()
+
+        # Metric cards
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="metric-card"><div class="val">{len(result1.get("key_facts",[]))}</div><div class="lbl">Key Facts</div></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="metric-card"><div class="val" style="color:#16a34a">{len(result1.get("strong_points",[]))}</div><div class="lbl">Strong Points</div></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="metric-card"><div class="val" style="color:#dc2626">{len(result1.get("weak_points",[]))}</div><div class="lbl">Weak Points</div></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="metric-card"><div class="val" style="color:#d97706">{len(result1.get("contradictions",[]))}</div><div class="lbl">Contradictions</div></div>', unsafe_allow_html=True)
+        metrics = [
+            (m1, len(result1.get("key_facts", [])),       "Key Facts",       "#1a2744", "#f0f4ff"),
+            (m2, len(result1.get("strong_points", [])),   "Strong Points",   "#16a34a", "#f0fdf4"),
+            (m3, len(result1.get("weak_points", [])),     "Weak Points",     "#dc2626", "#fef2f2"),
+            (m4, len(result1.get("contradictions", [])),  "Contradictions",  "#d97706", "#fffbeb"),
+        ]
+        for col, val, label, fg, bg in metrics:
+            col.markdown(
+                f'<div style="background:{bg};border-radius:10px;padding:.8rem;text-align:center;'
+                f'border-top:3px solid {fg}">'
+                f'<div style="font-size:1.6rem;font-weight:700;color:{fg}">{val}</div>'
+                f'<div style="font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em">{label}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
         ea_tabs = st.tabs([
             "📌 Key Facts", "✅ Strong Points", "⚠️ Weak Points", "🔄 Contradictions",
             "❓ Missing Facts", "💬 Follow-Up", "🔬 Cross-Examination", "📅 Timeline",
         ])
         with ea_tabs[0]:
-            for f in result1.get("key_facts",[]): st.markdown(f"- {f}")
+            for i, f in enumerate(result1.get("key_facts", []), 1):
+                st.markdown(
+                    f'<div style="background:#f0f4ff;border-radius:8px;padding:.5rem .9rem;'
+                    f'margin-bottom:.3rem;display:flex;gap:.8rem;align-items:flex-start">'
+                    f'<span style="font-weight:700;color:#1a2744;flex-shrink:0">{i}.</span>'
+                    f'<span style="color:#334155">{f}</span></div>',
+                    unsafe_allow_html=True,
+                )
         with ea_tabs[1]:
-            for s in result1.get("strong_points",[]): st.success(s)
+            for s in result1.get("strong_points", []):
+                st.success(s)
         with ea_tabs[2]:
-            for w in result1.get("weak_points",[]): st.warning(w)
+            for w in result1.get("weak_points", []):
+                st.warning(w)
         with ea_tabs[3]:
-            for c in result1.get("contradictions",[]):
-                with st.expander(f"**{c.get('issue','')}**"):
-                    for t in c.get("conflicting_texts",[]): st.markdown(f"- `{t}`")
-                    st.markdown(f"**Why it matters:** {c.get('why_it_matters','')}")
+            for c in result1.get("contradictions", []):
+                with st.expander(f"**{c.get('issue', '')}**"):
+                    for t in c.get("conflicting_texts", []):
+                        st.markdown(f"- `{t}`")
+                    st.markdown(f"**Why it matters:** {c.get('why_it_matters', '')}")
         with ea_tabs[4]:
-            for m in result1.get("missing_facts",[]): st.markdown(f"- {m}")
+            for m in result1.get("missing_facts", []):
+                st.markdown(f"- {m}")
         with ea_tabs[5]:
-            for q in result1.get("follow_up_questions",[]): st.markdown(f"- {q}")
+            for q in result1.get("follow_up_questions", []):
+                st.markdown(f"- {q}")
         with ea_tabs[6]:
-            for q in result1.get("cross_examination_questions",[]): st.markdown(f"- {q}")
+            for q in result1.get("cross_examination_questions", []):
+                st.markdown(
+                    f'<div style="background:#f8fafc;border-radius:8px;padding:.55rem .9rem;'
+                    f'margin-bottom:.3rem;border-left:3px solid #1a2744;font-size:.88rem;color:#1e293b">'
+                    f'❓ {q}</div>',
+                    unsafe_allow_html=True,
+                )
         with ea_tabs[7]:
-            for t in result1.get("timeline_facts",[]): st.markdown(f"- {t}")
+            for t in result1.get("timeline_facts", []):
+                st.markdown(f"- {t}")
+
         st.markdown("<br>", unsafe_allow_html=True)
         c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Download Analysis (.json)", result1, "evidence_analysis.json", key="ea_dl")
+        with c1:
+            download_json("📥 Download Analysis (.json)", result1, "evidence_analysis.json", key="ea_dl")
         with c3:
             if st.button("🔄 Reset", key="ea_rst", use_container_width=True):
-                st.session_state.pop("ea_result", None); st.rerun()
+                st.session_state.pop("ea_result", None)
+                st.rerun()
 
 # ── 2. Witness Statement Analyzer ────────────────────────────────
 with tab2:
@@ -109,45 +146,74 @@ with tab2:
                     st.success("✅ Analysis complete!")
                 except Exception as exc:
                     st.error(f"Analysis failed: {exc}")
+
     if st.session_state.get("wa_result"):
         r = st.session_state.wa_result
         st.divider()
-        score = r.get("credibility_score", 0)
+
+        score  = r.get("credibility_score", 0)
         rating = r.get("credibility_rating", "—")
-        score_color = {"High": "#16a34a", "Medium": "#d97706", "Low": "#dc2626"}.get(rating, "#64748b")
+        CRED_CFG = {
+            "High":   ("#16a34a", "#f0fdf4"),
+            "Medium": ("#d97706", "#fffbeb"),
+            "Low":    ("#dc2626", "#fef2f2"),
+        }
+        score_fg, score_bg = CRED_CFG.get(rating, ("#64748b", "#f1f5f9"))
+
         m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f'<div class="metric-card"><div class="val" style="color:{score_color}">{rating}</div><div class="lbl">Credibility</div></div>', unsafe_allow_html=True)
-        m2.markdown(f'<div class="metric-card"><div class="val" style="color:#dc2626">{len(r.get("inconsistent_with_facts",[]))}</div><div class="lbl">Contradictions</div></div>', unsafe_allow_html=True)
-        m3.markdown(f'<div class="metric-card"><div class="val" style="color:#d97706">{len(r.get("internal_inconsistencies",[]))}</div><div class="lbl">Internal Issues</div></div>', unsafe_allow_html=True)
-        m4.markdown(f'<div class="metric-card"><div class="val">{len(r.get("gaps_and_omissions",[]))}</div><div class="lbl">Gaps</div></div>', unsafe_allow_html=True)
-        st.markdown(f"**Credibility Assessment:** {r.get('credibility_assessment','')}")
+        wa_metrics = [
+            (m1, rating,                                            "Credibility",    score_fg, score_bg),
+            (m2, len(r.get("inconsistent_with_facts", [])),        "Contradictions", "#dc2626", "#fef2f2"),
+            (m3, len(r.get("internal_inconsistencies", [])),       "Internal Issues","#d97706", "#fffbeb"),
+            (m4, len(r.get("gaps_and_omissions", [])),             "Gaps",           "#64748b", "#f1f5f9"),
+        ]
+        for col, val, label, fg, bg in wa_metrics:
+            col.markdown(
+                f'<div style="background:{bg};border-radius:10px;padding:.8rem;text-align:center;'
+                f'border-top:3px solid {fg}">'
+                f'<div style="font-size:1.4rem;font-weight:700;color:{fg}">{val}</div>'
+                f'<div style="font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em">{label}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(f"<br>**Credibility Assessment:** {r.get('credibility_assessment', '')}", unsafe_allow_html=True)
+
         wa_tabs = st.tabs(["📋 Key Claims", "⚠️ Contradictions", "🔄 Internal Issues",
                             "❓ Gaps", "💡 Motives", "✅ Strong Points", "📝 Deposition Notes"])
         with wa_tabs[0]:
-            for c in r.get("key_claims",[]): st.markdown(f"- {c}")
+            for c in r.get("key_claims", []):
+                st.markdown(f"- {c}")
         with wa_tabs[1]:
-            for i in r.get("inconsistent_with_facts",[]):
-                sev = i.get("significance","medium")
+            for i in r.get("inconsistent_with_facts", []):
+                sev = i.get("significance", "medium")
                 fn = st.error if sev == "high" else st.warning
-                fn(f"**Claim:** {i.get('claim','')}  |  **Contradiction:** {i.get('contradiction','')}")
+                fn(f"**Claim:** {i.get('claim', '')}  |  **Contradiction:** {i.get('contradiction', '')}")
         with wa_tabs[2]:
-            for i in r.get("internal_inconsistencies",[]):
-                with st.expander(f"Internal conflict: {i.get('issue','')}"):
-                    st.markdown(f"*Text 1:* {i.get('text_1','')}")
-                    st.markdown(f"*Text 2:* {i.get('text_2','')}")
+            for i in r.get("internal_inconsistencies", []):
+                with st.expander(f"Internal conflict: {i.get('issue', '')}"):
+                    st.markdown(f"*Text 1:* {i.get('text_1', '')}")
+                    st.markdown(f"*Text 2:* {i.get('text_2', '')}")
         with wa_tabs[3]:
-            for g in r.get("gaps_and_omissions",[]): st.warning(g)
+            for g in r.get("gaps_and_omissions", []):
+                st.warning(g)
         with wa_tabs[4]:
-            for m in r.get("possible_motives",[]): st.info(m)
+            for m in r.get("possible_motives", []):
+                st.info(m)
         with wa_tabs[5]:
-            for s in r.get("strong_points",[]): st.success(s)
+            for s in r.get("strong_points", []):
+                st.success(s)
         with wa_tabs[6]:
-            for n in r.get("deposition_notes",[]): st.markdown(f"- {n}")
+            for n in r.get("deposition_notes", []):
+                st.markdown(f"- {n}")
+
         c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Download Analysis (.json)", r, "witness_analysis.json", key="wa_dl")
+        with c1:
+            download_json("📥 Download Analysis (.json)", r, "witness_analysis.json", key="wa_dl")
         with c3:
             if st.button("🔄 Reset", key="wa_rst", use_container_width=True):
-                st.session_state.pop("wa_result", None); st.rerun()
+                st.session_state.pop("wa_result", None)
+                st.rerun()
 
 # ── 3. Cross-Examination Questions ───────────────────────────────
 with tab3:
@@ -179,28 +245,60 @@ with tab3:
                     st.success("✅ Cross-examination plan ready!")
                 except Exception as exc:
                     st.error(f"Generation failed: {exc}")
+
     if st.session_state.get("ce_result"):
         r = st.session_state.ce_result
         st.divider()
-        st.markdown(f"**Strategy:** {r.get('strategy_overview','')}")
-        st.markdown(f"**Opening Question:** _{r.get('opening_question','')}_")
-        st.markdown(f"**Closing Question:** _{r.get('closing_question','')}_")
+
+        # Strategy overview card
+        st.markdown(
+            f'<div style="background:#f0f4ff;border-radius:10px;padding:1rem 1.2rem;'
+            f'border-left:4px solid #1a2744;margin-bottom:1rem">'
+            f'<div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;'
+            f'letter-spacing:.05em;margin-bottom:.4rem">Strategy Overview</div>'
+            f'<div style="color:#1a2744">{r.get("strategy_overview", "")}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        col_o, col_c = st.columns(2)
+        col_o.info(f"**Opening:** _{r.get('opening_question', '')}_")
+        col_c.success(f"**Closing:** _{r.get('closing_question', '')}_")
+
         question_sets = r.get("question_sets", [])
+        st.markdown("<br>", unsafe_allow_html=True)
+        section(f"❓ Question Sets ({len(question_sets)} topics)")
+
+        Q_BADGE = {"leading": ("🔵", "#dbeafe"), "open": ("🟢", "#dcfce7"),
+                   "clarification": ("🟡", "#fef9c3"), "challenge": ("🔴", "#fee2e2")}
         for qs in question_sets:
-            with st.expander(f"📌 **{qs.get('topic','')}** — {qs.get('objective','')}"):
+            with st.expander(f"📌 **{qs.get('topic', '')}** — {qs.get('objective', '')}"):
                 for i, q in enumerate(qs.get("questions", []), 1):
-                    q_type_badge = {"leading": "🔵", "open": "🟢", "clarification": "🟡", "challenge": "🔴"}.get(q.get("type",""), "⚪")
-                    st.markdown(f"**Q{i}:** {q_type_badge} {q.get('question','')}")
-                    st.caption(f"Expected: {q.get('expected_answer','')}  |  Follow-up: {q.get('follow_up','')}")
-                    st.markdown("---")
+                    icon, qbg = Q_BADGE.get(q.get("type", ""), ("⚪", "#f1f5f9"))
+                    st.markdown(
+                        f'<div style="background:{qbg};border-radius:8px;padding:.55rem .9rem;'
+                        f'margin-bottom:.4rem">'
+                        f'<div style="font-size:.88rem;font-weight:600;color:#1a2744">'
+                        f'Q{i} {icon} {q.get("question", "")}</div>'
+                        f'<div style="font-size:.76rem;color:#64748b;margin-top:.25rem">'
+                        f'Expected: {q.get("expected_answer", "")} · Follow-up: {q.get("follow_up", "")}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
         if r.get("points_to_establish"):
             section("🎯 Points to Establish")
-            for p in r["points_to_establish"]: st.markdown(f"- {p}")
+            for p in r["points_to_establish"]:
+                st.markdown(f"- {p}")
         if r.get("traps_to_avoid"):
             section("⚠️ Traps to Avoid")
-            for t in r["traps_to_avoid"]: st.warning(t)
+            for t in r["traps_to_avoid"]:
+                st.warning(t)
+
         c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Export Cross-Exam Plan (.json)", r, "cross_examination.json", key="ce_dl")
+        with c1:
+            download_json("📥 Export Cross-Exam Plan (.json)", r, "cross_examination.json", key="ce_dl")
         with c3:
             if st.button("🔄 Reset", key="ce_rst", use_container_width=True):
-                st.session_state.pop("ce_result", None); st.rerun()
+                st.session_state.pop("ce_result", None)
+                st.rerun()

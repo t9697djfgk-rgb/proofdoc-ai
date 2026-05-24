@@ -146,14 +146,35 @@ def message_composer(msg_type: str, form_key: str):
 # ── Client Discussion tab ─────────────────────────────────────────
 with tab_client:
     # Matter info bar
-    c1, c2, c3 = st.columns([3, 1, 1])
-    c1.markdown(f"**Matter:** {matter.get('ref','')} — {matter.get('title','')}")
-    c2.caption(f"Status: {matter.get('status','')}")
-    c3.caption(f"Jurisdiction: {matter.get('jurisdiction','')}")
-    st.divider()
-
     messages = db.list_messages(matter_id)
     client_msgs = [m for m in messages if m.get("message_type") == "client_visible"]
+
+    status = matter.get("status", "")
+    STATUS_COLOR = {"Active": "#16a34a", "Pending": "#d97706", "Closed": "#64748b", "Archived": "#94a3b8"}
+    s_color = STATUS_COLOR.get(status, "#64748b")
+
+    st.markdown(
+        f"""<div style="background:linear-gradient(135deg,#f0f4ff,#f8fafc);border:1px solid #e2e8f0;
+                        border-radius:10px;padding:.75rem 1.1rem;margin-bottom:.75rem;
+                        display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;color:#1a2744;font-size:.92rem">
+              {matter.get('ref','')} — {matter.get('title','')}
+            </div>
+            <div style="font-size:.78rem;color:#64748b;margin-top:.15rem">
+              {matter.get('jurisdiction','')}
+            </div>
+          </div>
+          <span style="font-size:.75rem;font-weight:700;color:{s_color};background:{s_color}18;
+                       padding:.2rem .7rem;border-radius:20px;border:1px solid {s_color}40;white-space:nowrap">
+            {status}
+          </span>
+          <span style="font-size:.75rem;color:#94a3b8;white-space:nowrap">
+            💬 {len(client_msgs)} message{'s' if len(client_msgs) != 1 else ''}
+          </span>
+        </div>""",
+        unsafe_allow_html=True,
+    )
 
     # Paginate
     PAGE_SIZE = 30

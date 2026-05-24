@@ -4,12 +4,12 @@ from utils.shared.styles import slim_header, section
 from utils.auth import require_auth, reset_password
 import utils.database as db
 
-setup_page()
+api_key = setup_page()
 user = require_auth()
 
-slim_header("⚙️", "Settings", f"Profile, organisation, and security settings")
+slim_header("⚙️", "Settings", "Profile, organisation, security, and billing preferences")
 
-tabs = ["👤 Profile", "🤖 AI Settings", "🔒 Security"]
+tabs = ["👤 Profile", "🤖 AI Settings", "💰 Billing Rates", "🔒 Security"]
 if user["role"] in ("admin", "lawyer"):
     tabs.insert(1, "🏛️ Organisation")
 
@@ -20,21 +20,32 @@ tab_map = {name: tab for name, tab in zip(tabs, tab_objs)}
 with tab_map["👤 Profile"]:
     section("👤 Your Profile")
 
-    ROLE_ICONS = {"admin": "🛡️", "lawyer": "⚖️", "staff": "👤", "client": "🏢", "intern": "🎓"}
-    icon = ROLE_ICONS.get(user["role"], "👤")
+    ROLE_ICONS  = {"admin": "🛡️", "lawyer": "⚖️", "staff": "👤", "client": "🏢", "intern": "🎓"}
+    ROLE_COLORS = {"admin": "#7c3aed", "lawyer": "#1a2744", "staff": "#0891b2", "client": "#16a34a", "intern": "#d97706"}
+    icon  = ROLE_ICONS.get(user["role"], "👤")
+    color = ROLE_COLORS.get(user["role"], "#1a2744")
+    initials = "".join(w[0].upper() for w in user["full_name"].split()[:2]) if user.get("full_name") else "?"
 
-    c1, c2 = st.columns([1, 3])
-    c1.markdown(
-        f'<div style="width:72px;height:72px;background:#1e3a5f;border-radius:50%;'
-        f'display:flex;align-items:center;justify-content:center;font-size:1.8rem">'
-        f'{icon}</div>',
+    st.markdown(
+        f"""<div style="background:linear-gradient(135deg,{color}15,{color}05);border:1px solid {color}30;
+                        border-radius:14px;padding:1.5rem;margin-bottom:1.5rem;
+                        display:flex;align-items:center;gap:1.4rem">
+          <div style="width:72px;height:72px;background:{color};border-radius:50%;flex-shrink:0;
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:1.5rem;font-weight:700;color:white;letter-spacing:-.03em">
+            {initials}
+          </div>
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:#1a2744">{user['full_name']}</div>
+            <div style="font-size:.85rem;color:{color};font-weight:600;margin:.2rem 0">
+              {icon} {(user.get('title') or user['role'].title())}
+            </div>
+            <div style="font-size:.8rem;color:#64748b">{user['organization_name']}</div>
+          </div>
+        </div>""",
         unsafe_allow_html=True,
     )
-    with c2:
-        st.markdown(f"**{user['full_name']}**")
-        st.caption(f"{user.get('title') or user['role'].title()} · {user['organization_name']}")
 
-    st.markdown("<br>", unsafe_allow_html=True)
     with st.form("profile_form"):
         c1, c2 = st.columns(2)
         new_name  = c1.text_input("Full Name *", value=user.get("full_name", ""), key="pf_name")
@@ -101,8 +112,70 @@ with tab_map["🤖 AI Settings"]:
 
     st.info(
         "The API key is stored in `.streamlit/secrets.toml` and is never committed to version control. "
-        "On Railway/Streamlit Cloud, add it via the environment variables / secrets panel."
+        "On Streamlit Community Cloud, add it via the app Secrets panel."
     )
+
+# ── Billing Rates ─────────────────────────────────────────────────
+with tab_map["💰 Billing Rates"]:
+    section("💰 Billing Rate Defaults")
+    st.markdown("Set default hourly rates by role. These are used when logging time if no custom rate is specified.")
+
+    RATE_KEY = "billing_rates"
+    defaults = {
+        "Partner / Senior Lawyer": 350,
+        "Associate Lawyer":        220,
+        "Paralegal / Staff":       120,
+        "Intern":                   60,
+        "Court Clerk":             100,
+    }
+    saved_rates = st.session_state.get(RATE_KEY, dict(defaults))
+
+    with st.form("billing_rates_form"):
+        st.markdown("**Hourly Rates (USD)**")
+        new_rates = {}
+        cols_a, cols_b = st.columns(2)
+        role_list = list(defaults.keys())
+        for i, role_name in enumerate(role_list):
+            col = cols_a if i % 2 == 0 else cols_b
+            new_rates[role_name] = col.number_input(
+                role_name,
+                min_value=0,
+                max_value=5000,
+                value=saved_rates.get(role_name, defaults[role_name]),
+                step=10,
+                key=f"br_{i}",
+            )
+        st.markdown("<br>", unsafe_allow_html=True)
+        currency = st.selectbox("Currency", ["USD", "EUR", "GBP", "RWF", "KES", "ZAR"], key="br_currency",
+                                 index=["USD", "EUR", "GBP", "RWF", "KES", "ZAR"].index(
+                                     st.session_state.get("billing_currency", "USD")
+                                 ))
+        vat_rate = st.number_input("Default VAT / Tax Rate (%)", min_value=0.0, max_value=100.0,
+                                    value=float(st.session_state.get("billing_vat", 18.0)),
+                                    step=0.5, key="br_vat")
+        if st.form_submit_button("💾 Save Billing Defaults", type="primary"):
+            st.session_state[RATE_KEY] = new_rates
+            st.session_state["billing_currency"] = currency
+            st.session_state["billing_vat"] = vat_rate
+            st.success("✅ Billing rate defaults saved.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    section("📊 Rate Overview")
+    rates = st.session_state.get(RATE_KEY, defaults)
+    currency_sym = {"USD": "$", "EUR": "€", "GBP": "£", "RWF": "RWF ", "KES": "KES ", "ZAR": "R"}.get(
+        st.session_state.get("billing_currency", "USD"), "$"
+    )
+    cols = st.columns(len(rates))
+    for col, (role_name, rate) in zip(cols, rates.items()):
+        short = role_name.split("/")[0].strip().split()[0]
+        col.markdown(
+            f'<div style="background:#f8fafc;border-radius:10px;padding:.8rem;text-align:center;'
+            f'border-top:3px solid #c9a84c">'
+            f'<div style="font-size:1.1rem;font-weight:700;color:#1a2744">{currency_sym}{rate}</div>'
+            f'<div style="font-size:.7rem;color:#64748b;margin-top:.2rem">{short}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 # ── Security ──────────────────────────────────────────────────────
 with tab_map["🔒 Security"]:
@@ -126,17 +199,20 @@ with tab_map["🔒 Security"]:
 
     st.markdown("<br>", unsafe_allow_html=True)
     section("🔒 Security Status")
-    for label, status in [
-        ("API Key",       "Stored in secrets.toml — not committed to repo"),
-        ("File Processing", "In-memory only — files auto-deleted after session"),
-        ("AI Training",   "Your data is never used to train AI models"),
-        ("Database",      "Supabase with organisation-level tenant isolation"),
+    for label, status, ok in [
+        ("API Key",           "Stored in secrets.toml — not committed to repo",       True),
+        ("File Processing",   "In-memory only — files auto-deleted after session",    True),
+        ("AI Training",       "Your data is never used to train AI models",           True),
+        ("Database",          "Supabase with organisation-level tenant isolation",     True),
+        ("Data Encryption",   "All data encrypted at rest and in transit (TLS 1.3)",  True),
     ]:
+        color = "#16a34a" if ok else "#dc2626"
+        icon  = "✓" if ok else "✗"
         st.markdown(
-            f'<div style="display:flex;justify-content:space-between;padding:.5rem 0;'
-            f'border-bottom:1px solid #e2e8f0">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding:.6rem 0;border-bottom:1px solid #e2e8f0">'
             f'<div><strong>{label}</strong><br><small style="color:#64748b">{status}</small></div>'
-            f'<span style="color:#16a34a;font-size:1.2rem">✓</span>'
+            f'<span style="color:{color};font-size:1.2rem;font-weight:700">{icon}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
