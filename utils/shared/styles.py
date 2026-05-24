@@ -76,6 +76,22 @@ _CSS = """
 }
 
 /* ═══════════════════════════════════════════════════
+   HIDE ALL STREAMLIT CHROME
+═══════════════════════════════════════════════════ */
+/* Hamburger menu */
+#MainMenu                                { display: none !important; }
+/* "Made with Streamlit" footer */
+footer                                   { display: none !important; }
+/* Deploy button & toolbar */
+[data-testid="stToolbar"]               { display: none !important; }
+[data-testid="stDecoration"]            { display: none !important; }
+[data-testid="stStatusWidget"]          { display: none !important; }
+/* Running indicator */
+[data-testid="stAppRunningMan"]         { display: none !important; }
+/* Top header bar — we show our own in the sidebar */
+header[data-testid="stHeader"]          { display: none !important; }
+
+/* ═══════════════════════════════════════════════════
    BASE RESET
 ═══════════════════════════════════════════════════ */
 html, body, [class*="css"] {
@@ -105,11 +121,6 @@ html, body, [class*="css"] {
 }
 [data-testid="block-container"] {
     background: transparent !important;
-}
-header[data-testid="stHeader"] {
-    background: var(--surface) !important;
-    border-bottom: 1px solid var(--border) !important;
-    backdrop-filter: blur(8px);
 }
 
 /* ═══════════════════════════════════════════════════
