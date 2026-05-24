@@ -320,92 +320,79 @@ with col_form:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Check Supabase is reachable before showing the form ──
+    from utils.auth import sign_in, register_firm
     import os as _os
-    _supa_url = _os.environ.get("SUPABASE_URL", "") or ""
-    if not _supa_url:
-        try:
-            _supa_url = st.secrets.get("SUPABASE_URL", "") or ""
-        except Exception:
-            _supa_url = ""
 
-    if not _supa_url:
-        st.error(
-            "⚙️ **Database not configured.** "
-            "SUPABASE_URL is missing from Railway environment variables. "
-            "Go to Railway → your project → Variables and add SUPABASE_URL, "
-            "SUPABASE_ANON_KEY, and SUPABASE_SERVICE_KEY."
-        )
-        st.stop()
+    # ── Show stored feedback from previous run ─────────────────────
+    _msg = st.session_state.pop("_auth_msg", None)
+    if _msg:
+        getattr(st, _msg[0])(_msg[1])
 
-    tab_login, tab_register = st.tabs(["Sign In", "Register New Firm"])
+    # ── Sign-in form ───────────────────────────────────────────────
+    with st.form("login_form", clear_on_submit=False):
+        email    = st.text_input("Email address", placeholder="you@yourfirm.com")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Sign In →", type="primary", use_container_width=True)
 
-    with tab_login:
-        login_msg = st.empty()
-        email    = st.text_input("Email address", placeholder="you@yourfirm.com", key="li_email")
-        password = st.text_input("Password", type="password", key="li_pw")
-
-        if st.button("Sign In →", type="primary", use_container_width=True, key="li_btn"):
-            if not email.strip() or not password:
-                login_msg.warning("Please enter your email and password.")
-            else:
-                from utils.auth import sign_in
-                with st.spinner("Signing in…"):
-                    result = sign_in(email.strip(), password)
+    if submitted:
+        if not email.strip() or not password:
+            st.session_state["_auth_msg"] = ("warning", "Please enter your email and password.")
+        else:
+            try:
+                result = sign_in(email.strip(), password)
                 if result["ok"]:
                     st.rerun()
                 else:
-                    login_msg.error(f"❌ {result['error']}")
+                    st.session_state["_auth_msg"] = ("error", f"❌ {result['error']}")
+            except Exception as exc:
+                st.session_state["_auth_msg"] = ("error", f"❌ Unexpected error: {exc}")
+        st.rerun()
 
-        st.caption("Forgot your password? Ask your firm administrator to reset it.")
+    st.caption("Forgot your password? Ask your firm administrator to reset it.")
 
-    with tab_register:
+    # ── Register new firm (collapsed by default) ───────────────────
+    with st.expander("Create a new firm account"):
+        _reg_msg = st.session_state.pop("_reg_msg", None)
+        if _reg_msg:
+            getattr(st, _reg_msg[0])(_reg_msg[1])
+
         st.markdown(
             "<p style='font-size:.83rem;color:#6b7280;margin:0 0 .8rem'>"
-            "Create a new firm account — you will be the <strong style='color:#1a2744'>admin</strong>.</p>",
+            "You will become the <strong style='color:#1a2744'>admin</strong> for the new firm.</p>",
             unsafe_allow_html=True,
         )
-        reg_msg   = st.empty()
-        firm_name = st.text_input("Law Firm Name", placeholder="e.g. Nkurunziza & Associates", key="reg_firm")
-        full_name = st.text_input("Your Full Name", placeholder="e.g. Marie Uwimana", key="reg_name")
-        reg_email = st.text_input("Email", placeholder="admin@yourfirm.com", key="reg_email")
-        c1, c2 = st.columns(2)
-        with c1:
-            reg_pw  = st.text_input("Password", type="password", help="Min 8 characters", key="reg_pw")
-        with c2:
-            reg_pw2 = st.text_input("Confirm", type="password", key="reg_pw2")
+        with st.form("register_form", clear_on_submit=False):
+            firm_name = st.text_input("Law Firm Name", placeholder="e.g. Nkurunziza & Associates")
+            full_name = st.text_input("Your Full Name", placeholder="e.g. Marie Uwimana")
+            reg_email = st.text_input("Email", placeholder="admin@yourfirm.com")
+            c1, c2 = st.columns(2)
+            with c1:
+                reg_pw  = st.text_input("Password", type="password", help="Min 8 characters")
+            with c2:
+                reg_pw2 = st.text_input("Confirm password", type="password")
+            reg_submitted = st.form_submit_button("Create Firm Account →", type="primary",
+                                                   use_container_width=True)
 
-        if st.button("Create Firm Account →", type="primary", use_container_width=True, key="reg_btn"):
+        if reg_submitted:
             errors = []
-            if not firm_name.strip(): errors.append("Firm name is required.")
-            if not full_name.strip(): errors.append("Your name is required.")
-            if not reg_email.strip(): errors.append("Email is required.")
-            if len(reg_pw) < 8:       errors.append("Password must be at least 8 characters.")
-            if reg_pw != reg_pw2:     errors.append("Passwords do not match.")
+            if not firm_name.strip(): errors.append("Firm name required.")
+            if not full_name.strip(): errors.append("Your name required.")
+            if not reg_email.strip(): errors.append("Email required.")
+            if len(reg_pw) < 8:       errors.append("Password min 8 chars.")
+            if reg_pw != reg_pw2:     errors.append("Passwords don't match.")
             if errors:
-                reg_msg.warning(" · ".join(errors))
+                st.session_state["_reg_msg"] = ("warning", " · ".join(errors))
             else:
-                from utils.auth import register_firm
-                with st.spinner("Creating account…"):
+                try:
                     result = register_firm(firm_name.strip(), reg_email.strip(),
                                            reg_pw, full_name.strip())
-                if result["ok"]:
-                    st.rerun()
-                else:
-                    reg_msg.error(f"❌ {result['error']}")
-
-    # ── Connection diagnostics (always visible) ───────────────────────
-    import os as _diag_os
-    _d_url  = bool(_diag_os.environ.get("SUPABASE_URL", "").strip())
-    _d_anon = bool(_diag_os.environ.get("SUPABASE_ANON_KEY", "").strip())
-    _d_svc  = bool(_diag_os.environ.get("SUPABASE_SERVICE_KEY", "").strip())
-    if not (_d_url and _d_anon and _d_svc):
-        st.warning(
-            f"⚙️ **Railway env vars missing:**  "
-            f"SUPABASE_URL {'✅' if _d_url else '❌'}  "
-            f"SUPABASE_ANON_KEY {'✅' if _d_anon else '❌'}  "
-            f"SUPABASE_SERVICE_KEY {'✅' if _d_svc else '❌'}"
-        )
+                    if result["ok"]:
+                        st.rerun()
+                    else:
+                        st.session_state["_reg_msg"] = ("error", f"❌ {result['error']}")
+                except Exception as exc:
+                    st.session_state["_reg_msg"] = ("error", f"❌ Unexpected error: {exc}")
+            st.rerun()
 
     st.markdown(
         "<div class='f-foot'>&#9878; eLawFirm &nbsp;&middot;&nbsp; AI output does not replace qualified legal advice</div>",
