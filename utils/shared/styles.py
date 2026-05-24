@@ -325,8 +325,36 @@ p, li, span, label { color: var(--text-body) !important; }
 .stButton > button:focus,
 .stButton > button p,
 .stButton > button span,
-.stButton > button div {
+.stButton > button div,
+/* Form submit buttons */
+.stFormSubmitButton > button,
+.stFormSubmitButton > button:visited,
+.stFormSubmitButton > button:hover,
+.stFormSubmitButton > button:active,
+.stFormSubmitButton > button:focus,
+.stFormSubmitButton > button p,
+.stFormSubmitButton > button span,
+.stFormSubmitButton > button div,
+.stFormSubmitButton [data-testid="baseButton-primary"],
+.stFormSubmitButton [data-testid="baseButton-secondary"] {
     color: #ffffff !important;
+}
+/* Form submit button base style */
+.stFormSubmitButton > button {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 500 !important;
+    border-radius: var(--radius) !important;
+    border: none !important;
+    background: linear-gradient(135deg, #1a2744 0%, #253461 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(26,39,68,0.25) !important;
+    transition: var(--transition) !important;
+    cursor: pointer !important;
+}
+.stFormSubmitButton > button:hover {
+    background: linear-gradient(135deg, #0f1a33 0%, #1a2744 100%) !important;
+    box-shadow: 0 6px 20px rgba(26,39,68,0.3) !important;
+    transform: translateY(-2px) !important;
 }
 /* Download = gold */
 .stDownloadButton > button {

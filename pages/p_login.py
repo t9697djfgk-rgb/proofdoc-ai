@@ -323,6 +323,16 @@ with col_form:
     from utils.auth import sign_in, register_firm
     import os as _os
 
+    # ── Env-var status banner (shows on Railway if vars are missing) ──
+    _v = {k: bool(_os.environ.get(k, "").strip()) for k in
+          ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY")}
+    if not all(_v.values()):
+        st.error(
+            "⚙️ **Server not configured.** Missing Railway variables: "
+            + ", ".join(k for k, ok in _v.items() if not ok)
+            + "  ·  Go to Railway → your project → Variables and add them."
+        )
+
     # ── Show stored feedback from previous run ─────────────────────
     _msg = st.session_state.pop("_auth_msg", None)
     if _msg:

@@ -4,11 +4,12 @@ from supabase import create_client, Client
 
 
 def _secret(key: str) -> str:
-    val = os.environ.get(key, "")
+    # Strip whitespace and accidental quotes that Railway sometimes adds
+    val = os.environ.get(key, "").strip().strip('"').strip("'")
     if val:
         return val
     try:
-        return st.secrets[key]
+        return str(st.secrets.get(key, "")).strip()
     except Exception:
         return ""
 
