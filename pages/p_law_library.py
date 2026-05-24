@@ -26,7 +26,19 @@ CREATE INDEX IF NOT EXISTS idx_law_library_org ON law_library(organization_id);
 """
 
 # ── Setup check ────────────────────────────────────────────────────
-if not db.law_library_available():
+try:
+    _law_lib_ok = db.law_library_available()
+except AttributeError:
+    # database module loaded before this code was deployed — force a hard reload
+    import importlib, utils.database as _dbmod
+    importlib.reload(_dbmod)
+    import utils.database as db
+    try:
+        _law_lib_ok = db.law_library_available()
+    except AttributeError:
+        _law_lib_ok = False
+
+if not _law_lib_ok:
     st.warning("The **law_library** table has not been created in your Supabase project yet.")
     st.markdown("Run the following SQL once in your **Supabase → SQL Editor**, then refresh:")
     st.code(_SETUP_SQL, language="sql")
