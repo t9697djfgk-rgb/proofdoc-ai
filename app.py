@@ -4,7 +4,7 @@ from utils.database import init_db
 init_db()
 
 st.set_page_config(
-    page_title="ProofDoc AI · Legal Workspace",
+    page_title="eLawFirm · Legal Workspace",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",

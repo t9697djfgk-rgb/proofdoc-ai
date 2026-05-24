@@ -8,7 +8,7 @@ from datetime import datetime
 class ConfidentialityManager:
     def __init__(self):
         self.session_id = secrets.token_hex(16)
-        self.workspace = tempfile.mkdtemp(prefix=f"proofdoc_{self.session_id[:8]}_")
+        self.workspace = tempfile.mkdtemp(prefix=f"elawfirm_{self.session_id[:8]}_")
         self.audit_log = []
 
     def log_action(self, action: str, filename: str, confidence: float = None):

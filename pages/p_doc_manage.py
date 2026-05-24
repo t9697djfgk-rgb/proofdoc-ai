@@ -105,7 +105,7 @@ with tab_version:
 with tab_esig:
     placeholder_feature(
         "✍️", "E-Signature",
-        "Send documents for legally binding electronic signature from within ProofDoc AI.",
+        "Send documents for legally binding electronic signature from within eLawFirm.",
         ["Upload document and add signature fields", "Send to one or multiple signatories",
          "Track signature status in real time", "Download fully signed and certified copy"],
         ["Signature-ready document", "Email notification to signatories",
@@ -180,7 +180,7 @@ with tab_export:
                     _, label, slug = _RESULT_LABELS[k]
                     combined[slug] = {"label": label, "data": st.session_state[k]}
                 buf = _io.BytesIO(_json.dumps(combined, indent=2).encode())
-                fname = f"{prefix}proofdoc_export.json"
+                fname = f"{prefix}elawfirm_export.json"
                 st.download_button("📥 Download Combined JSON", buf.getvalue(),
                                    fname, "application/json", key="exp_dl_combined")
                 st.success(f"✅ {len(selected_keys)} results combined into {fname}")
@@ -191,7 +191,7 @@ with tab_export:
                         _, label, slug = _RESULT_LABELS[k]
                         data = _json.dumps(st.session_state[k], indent=2)
                         zf.writestr(f"{prefix}{slug}.json", data)
-                fname = f"{prefix}proofdoc_export.zip"
+                fname = f"{prefix}elawfirm_export.zip"
                 st.download_button("📥 Download ZIP", zip_buf.getvalue(),
                                    fname, "application/zip", key="exp_dl_zip")
                 st.success(f"✅ {len(selected_keys)} files bundled into {fname}")

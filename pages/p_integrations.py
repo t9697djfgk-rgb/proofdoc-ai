@@ -5,7 +5,7 @@ from utils.shared.styles import slim_header, group_header
 from utils.auth import require_lawyer
 setup_page()
 require_lawyer()
-slim_header("🔗", "Integrations", "Connect ProofDoc AI to your existing tools and platforms")
+slim_header("🔗", "Integrations", "Connect eLawFirm to your existing tools and platforms")
 
 st.markdown(
     '<div class="disclaimer-box">ℹ️ Integrations are currently in development. '
@@ -14,7 +14,7 @@ st.markdown(
 )
 
 _integrations = [
-    ("📧", "Email (SMTP / Outlook)", "Send documents and intake summaries directly from ProofDoc AI.", "Coming Soon"),
+    ("📧", "Email (SMTP / Outlook)", "Send documents and intake summaries directly from eLawFirm.", "Coming Soon"),
     ("📝", "Microsoft Word / Office 365", "Open and edit documents in Word and sync changes back.", "Coming Soon"),
     ("📁", "Google Drive", "Import documents from Google Drive and save outputs directly.", "Coming Soon"),
     ("☁️", "OneDrive / SharePoint", "Sync with your firm's Microsoft cloud document store.", "Coming Soon"),
@@ -23,7 +23,7 @@ _integrations = [
     ("✍️", "E-Signature (DocuSign / Adobe Sign)", "Send documents for electronic signature without leaving the app.", "Coming Soon"),
     ("⚖️", "Legal Databases (Westlaw / LexisNexis)", "Pull case law and statute references into your research.", "Coming Soon"),
     ("🔐", "Single Sign-On (SSO / SAML)", "Authenticate with your firm's existing identity provider.", "Coming Soon"),
-    ("🔌", "Zapier / Make (Automation)", "Build custom automation workflows between ProofDoc AI and other apps.", "Coming Soon"),
+    ("🔌", "Zapier / Make (Automation)", "Build custom automation workflows between eLawFirm and other apps.", "Coming Soon"),
     ("💼", "Practice Management Systems", "Sync matters, time, and billing with popular legal PMS platforms.", "Coming Soon"),
     ("📊", "Accounting (QuickBooks / Xero)", "Export invoices and financial data to your accounting software.", "Coming Soon"),
 ]

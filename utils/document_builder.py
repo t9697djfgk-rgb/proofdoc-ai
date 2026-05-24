@@ -53,7 +53,7 @@ class DocumentBuilder:
             ("Pages Processed:", str(data.get("total_pages", 1))),
             ("AI Confidence:", f"{data.get('avg_confidence', 0):.1f}%"),
             ("Reconstruction Date:", datetime.now().strftime("%B %d, %Y at %H:%M")),
-            ("Powered By:", "ProofDoc AI (Claude Opus 4.7)"),
+            ("Powered By:", "eLawFirm (Claude Opus 4.7)"),
         ]
         for i, (label, value) in enumerate(rows):
             tbl.cell(i, 0).text = label

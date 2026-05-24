@@ -254,7 +254,7 @@ def inject_css() -> None:
 def page_header(icon: str, title: str, subtitle: str) -> None:
     st.markdown(
         f'<div class="hero"><h1>{icon} {title}</h1><p class="sub">{subtitle}</p>'
-        '<span class="badge">⚖️ ProofDoc AI Legal Workspace &nbsp;·&nbsp; Powered by Claude Opus 4.7</span></div>',
+        '<span class="badge">⚖️ eLawFirm Legal Workspace &nbsp;·&nbsp; Powered by Claude Opus 4.7</span></div>',
         unsafe_allow_html=True,
     )
 

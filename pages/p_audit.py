@@ -124,7 +124,7 @@ with tab_session:
         c1.download_button(
             "📥 Download Session Log (JSON)",
             json.dumps(audit, indent=2),
-            "proofdoc_session_audit.json",
+            "elawfirm_session_audit.json",
             "application/json",
             use_container_width=True,
         )

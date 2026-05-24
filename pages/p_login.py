@@ -17,7 +17,7 @@ st.markdown(
 _, col, _ = st.columns([1, 2, 1])
 
 with col:
-    st.markdown("## ⚖️ ProofDoc AI")
+    st.markdown("## ⚖️ eLawFirm")
     st.markdown("##### Secure Legal Workspace")
     st.markdown("<br>", unsafe_allow_html=True)
 

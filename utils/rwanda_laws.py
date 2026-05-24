@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 
 
-_HEADERS = {"User-Agent": "ProofDoc AI Legal Research Tool / research@proofdoc.ai"}
+_HEADERS = {"User-Agent": "eLawFirm Legal Research Tool / research@elawfirm.ai"}
 _BASE = "https://amategeko.gov.rw"
 _LIST_URL = f"{_BASE}/laws/in-force/1"
 

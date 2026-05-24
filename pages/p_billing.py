@@ -110,7 +110,7 @@ with tab_invoices:
                     f"Invoice No.:  {inv_ref}",
                     f"Date:         {today}",
                     f"",
-                    f"FROM: ProofDoc Law Firm",
+                    f"FROM: eLawFirm Law Firm",
                     f"TO:   {inv_client or 'Client'}",
                     f"RE:   Matter {matter.get('ref','')} — {matter.get('title','')}",
                     f"",
