@@ -290,20 +290,6 @@ body{font-family:'Inter',sans-serif;background:transparent;overflow:hidden}
     </div>
   </div>
 
-  <div class="hw-stats">
-    <div class="stat-row">
-      <div class="stat-top"><span>Document accuracy</span><strong>92%</strong></div>
-      <div class="stat-bar-bg"><div class="stat-bar-fill sb1"></div></div>
-    </div>
-    <div class="stat-row">
-      <div class="stat-top"><span>Research speed</span><strong>78&times; faster</strong></div>
-      <div class="stat-bar-bg"><div class="stat-bar-fill sb2"></div></div>
-    </div>
-    <div class="stat-row">
-      <div class="stat-top"><span>Client satisfaction</span><strong>4.9 / 5</strong></div>
-      <div class="stat-bar-bg"><div class="stat-bar-fill sb3"></div></div>
-    </div>
-  </div>
 </div>
 </body>
 </html>
