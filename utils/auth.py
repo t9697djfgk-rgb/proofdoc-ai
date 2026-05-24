@@ -4,10 +4,13 @@ from supabase import create_client, Client
 
 
 def _secret(key: str) -> str:
+    val = os.environ.get(key, "")
+    if val:
+        return val
     try:
         return st.secrets[key]
     except Exception:
-        return os.environ.get(key, "")
+        return ""
 
 
 @st.cache_resource

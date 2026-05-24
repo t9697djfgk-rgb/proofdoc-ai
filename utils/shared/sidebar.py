@@ -35,7 +35,9 @@ def render_sidebar(tool_name: str = "") -> str | None:
         if not user or user.get("role") in ("admin", "lawyer", "staff"):
             try:
                 import os as _os
-                api_key = st.secrets.get("ANTHROPIC_API_KEY") or _os.environ.get("ANTHROPIC_API_KEY") or ""
+                api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
+                if not api_key:
+                    api_key = st.secrets["ANTHROPIC_API_KEY"]
                 if not api_key:
                     raise KeyError
                 if tool_name:
