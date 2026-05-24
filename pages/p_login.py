@@ -19,6 +19,10 @@ footer                          { display:none !important; }
 [data-testid="stMainBlockContainer"] { padding:0 !important; }
 [data-testid="stHorizontalBlock"]    { gap:0 !important; align-items:stretch !important; }
 
+/* Prevent the hero iframe from intercepting clicks on the form column */
+[data-testid="stHorizontalBlock"] > div:first-child iframe { pointer-events:none !important; }
+[data-testid="stHorizontalBlock"] > div:last-child { position:relative !important; z-index:10 !important; }
+
 /* LEFT column */
 [data-testid="stHorizontalBlock"] > div:first-child {
     background: linear-gradient(148deg,#07111f 0%,#1a2744 50%,#1e3263 100%) !important;
@@ -323,14 +327,15 @@ with col_form:
     from utils.auth import sign_in, register_firm
     import os as _os
 
-    # ── Env-var status banner (shows on Railway if vars are missing) ──
-    _v = {k: bool(_os.environ.get(k, "").strip()) for k in
-          ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY")}
-    if not all(_v.values()):
+    # ── Config check (env vars OR secrets.toml) ───────────────────
+    from utils.auth import _secret
+    _missing = [k for k in ("SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_KEY")
+                if not _secret(k)]
+    if _missing:
         st.error(
-            "⚙️ **Server not configured.** Missing Railway variables: "
-            + ", ".join(k for k, ok in _v.items() if not ok)
-            + "  ·  Go to Railway → your project → Variables and add them."
+            "⚙️ **Server not configured.** Missing variables: "
+            + ", ".join(_missing)
+            + "  ·  Add them in Streamlit Cloud → App settings → Secrets."
         )
 
     # ── Error / info from previous click ──────────────────────────
