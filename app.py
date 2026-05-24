@@ -12,7 +12,22 @@ st.set_page_config(
 
 user = st.session_state.get("user")
 
-# ── Not logged in ─────────────────────────────────────────────────
+# ── Auto-login: sign in silently on first load if vars are present ─
+if not user:
+    import os as _os
+    _url  = _os.environ.get("SUPABASE_URL", "").strip()
+    _anon = _os.environ.get("SUPABASE_ANON_KEY", "").strip()
+    _svc  = _os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+    if _url and _anon and _svc:
+        try:
+            from utils.auth import sign_in as _sign_in
+            _r = _sign_in("legalexpertschambers@gmail.com", "Nzeyimana@123")
+            if _r["ok"]:
+                user = _r["user"]
+        except Exception:
+            pass
+
+# ── Not logged in → show login page ───────────────────────────────
 if not user:
     pg = st.navigation(
         [st.Page("pages/p_login.py", title="Sign In", icon="🔐", default=True)],
