@@ -124,12 +124,59 @@ html, body, [class*="css"] {
 }
 
 /* ═══════════════════════════════════════════════════
+   SIDEBAR TOGGLE BUTTON
+═══════════════════════════════════════════════════ */
+@keyframes togglePulse {
+    0%,100% { box-shadow: 2px 0 12px rgba(26,39,68,0.25); }
+    50%      { box-shadow: 2px 0 20px rgba(201,168,76,0.35); }
+}
+@keyframes arrowBounce {
+    0%,100% { transform: translateX(0) translateY(-50%); }
+    50%      { transform: translateX(2px) translateY(-50%); }
+}
+
+/* The toggle tab that sticks out from the sidebar edge */
+[data-testid="collapsedControl"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 22px !important;
+    height: 56px !important;
+    background: linear-gradient(180deg, #1a2744 0%, #253461 100%) !important;
+    border-radius: 0 10px 10px 0 !important;
+    box-shadow: 2px 0 12px rgba(26,39,68,0.3) !important;
+    cursor: pointer !important;
+    position: fixed !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 9999 !important;
+    transition: width 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+    animation: togglePulse 3s ease-in-out infinite !important;
+    border: none !important;
+    outline: none !important;
+}
+[data-testid="collapsedControl"]:hover {
+    width: 28px !important;
+    background: linear-gradient(180deg, #c9a84c 0%, #e8c97a 100%) !important;
+    box-shadow: 2px 0 20px rgba(201,168,76,0.4) !important;
+    animation: arrowBounce 0.6s ease-in-out infinite !important;
+}
+[data-testid="collapsedControl"] svg {
+    fill: #ffffff !important;
+    width: 12px !important;
+    height: 12px !important;
+    flex-shrink: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════
    SIDEBAR — Deep Navy (Law Firm Feel)
 ═══════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
     background: var(--navy) !important;
     border-right: none !important;
     box-shadow: 4px 0 24px rgba(26,39,68,0.12) !important;
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1),
+                min-width 0.3s cubic-bezier(0.4,0,0.2,1) !important;
 }
 [data-testid="stSidebar"] > div {
     background: var(--navy) !important;
