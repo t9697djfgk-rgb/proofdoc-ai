@@ -73,6 +73,50 @@ with st.sidebar:
 
     st.divider()
 
+    # Rwanda Law Library selector
+    st.markdown(
+        '<p style="font-size:0.75rem;font-weight:700;color:#1a2744;text-transform:uppercase;'
+        'letter-spacing:0.05em;margin-bottom:0.4rem">⚖️ Rwanda Laws</p>',
+        unsafe_allow_html=True,
+    )
+    if "chat_selected_laws" not in st.session_state:
+        st.session_state.chat_selected_laws = {}  # {id: title}
+
+    _law_search = st.text_input("Search library", placeholder="e.g. labour, land, company…",
+                                 key="chat_law_search", label_visibility="collapsed")
+    _law_list = []
+    try:
+        _law_list = db.list_laws(search=_law_search if _law_search else None)
+    except Exception:
+        pass
+
+    if _law_list:
+        for _lw in _law_list[:8]:
+            _checked = _lw["id"] in st.session_state.chat_selected_laws
+            if st.checkbox(
+                f"{_lw['title'][:38]}{'…' if len(_lw['title']) > 38 else ''}",
+                value=_checked,
+                key=f"law_chk_{_lw['id']}",
+            ):
+                st.session_state.chat_selected_laws[_lw["id"]] = _lw["title"]
+            else:
+                st.session_state.chat_selected_laws.pop(_lw["id"], None)
+    elif _law_search:
+        st.caption("No matching laws.")
+    else:
+        st.caption("Upload laws in ⚖️ Law Library first.")
+
+    if st.session_state.chat_selected_laws:
+        n = len(st.session_state.chat_selected_laws)
+        st.markdown(
+            f'<span style="background:#e8f0fe;color:#1a2744;font-size:0.75rem;'
+            f'font-weight:600;padding:0.2rem 0.6rem;border-radius:20px">'
+            f'{n} law{"s" if n > 1 else ""} selected</span>',
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
     # Deep analysis toggle
     deep_mode = st.toggle("🧠 Deep Analysis mode",
                           help="Enables extended thinking — slower but more thorough for complex questions",
@@ -141,6 +185,23 @@ def _build_system() -> str:
             + doc_context.strip()
             + "\n── END DOCUMENT ──"
         )
+
+    selected_laws = st.session_state.get("chat_selected_laws", {})
+    for law_id, law_title in selected_laws.items():
+        try:
+            law_text = db.get_law_text(law_id)
+            if law_text:
+                # Truncate very large laws to keep context manageable (50k chars ≈ 65k tokens)
+                truncated = law_text[:50_000]
+                note = f"\n[Note: text truncated at 50,000 chars — full law is longer]" if len(law_text) > 50_000 else ""
+                parts.append(
+                    f"\n\n── RWANDA LAW: {law_title} ──\n"
+                    + truncated + note
+                    + f"\n── END LAW: {law_title} ──"
+                )
+        except Exception:
+            pass
+
     return "\n".join(parts)
 
 
@@ -163,6 +224,11 @@ if _matter_id:
 if doc_context and doc_context.strip():
     badges.append('<span style="background:#fdf6e3;color:#92400e;font-size:0.75rem;font-weight:600;'
                   'padding:0.2rem 0.6rem;border-radius:20px;margin-right:0.4rem">📄 Document attached</span>')
+if st.session_state.get("chat_selected_laws"):
+    n = len(st.session_state.chat_selected_laws)
+    badges.append(f'<span style="background:#f0fdf4;color:#166534;font-size:0.75rem;font-weight:600;'
+                  f'padding:0.2rem 0.6rem;border-radius:20px;margin-right:0.4rem">'
+                  f'⚖️ {n} law{"s" if n > 1 else ""} loaded</span>')
 if deep_mode:
     badges.append('<span style="background:#f5f3ff;color:#6d28d9;font-size:0.75rem;font-weight:600;'
                   'padding:0.2rem 0.6rem;border-radius:20px">🧠 Deep Analysis</span>')

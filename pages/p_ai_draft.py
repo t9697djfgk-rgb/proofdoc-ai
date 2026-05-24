@@ -45,6 +45,29 @@ with tab1:
     tone = c1b.selectbox("Tone", ["Formal", "Balanced", "Protective / Conservative"], key="da_tone")
     additional = c2b.text_area("Additional Instructions", height=60,
         placeholder="Any clauses to include/exclude, specific language requirements…", key="da_add")
+
+    # ── Rwanda Law Library selector ────────────────────────────────
+    import utils.database as _db2
+    _all_laws = []
+    try:
+        _all_laws = _db2.list_laws()
+    except Exception:
+        pass
+    if _all_laws:
+        with st.expander("⚖️ Include Rwanda Laws as context (optional)", expanded=False):
+            st.caption("Select laws from your library to ground the draft in Rwandan legislation.")
+            if "da_selected_laws" not in st.session_state:
+                st.session_state.da_selected_laws = {}
+            for _lw in _all_laws:
+                _chk = _lw["id"] in st.session_state.da_selected_laws
+                if st.checkbox(f"{_lw['title']} ({_lw.get('year','')})",
+                               value=_chk, key=f"da_law_{_lw['id']}"):
+                    st.session_state.da_selected_laws[_lw["id"]] = _lw["title"]
+                else:
+                    st.session_state.da_selected_laws.pop(_lw["id"], None)
+            if st.session_state.da_selected_laws:
+                st.success(f"✅ {len(st.session_state.da_selected_laws)} law(s) will be included in the draft context.")
+
     if st.button("📝 Generate Draft", type="primary", disabled=not api_key, key="da_btn"):
         if not key_facts.strip():
             st.warning("⚠️ Key facts are required.")
@@ -52,8 +75,15 @@ with tab1:
             from utils.drafting_assistant import DraftingAssistant
             with st.spinner("Drafting with Claude Opus 4.7…"):
                 try:
+                    # Append selected Rwanda law text to additional instructions
+                    _law_ctx = ""
+                    for _lid, _ltitle in st.session_state.get("da_selected_laws", {}).items():
+                        _ltxt = _db2.get_law_text(_lid)
+                        if _ltxt:
+                            _law_ctx += f"\n\n=== APPLICABLE RWANDA LAW: {_ltitle} ===\n{_ltxt[:30_000]}\n=== END ==="
+                    _additional_with_laws = (additional or "") + _law_ctx
                     result = DraftingAssistant(api_key).draft(
-                        doc_type, jurisdiction, legal_style, parties, key_facts, tone, additional
+                        doc_type, jurisdiction, legal_style, parties, key_facts, tone, _additional_with_laws
                     )
                     st.session_state.da_result = result
                     st.success("✅ Draft generated!")

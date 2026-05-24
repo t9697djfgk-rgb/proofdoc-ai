@@ -451,6 +451,68 @@ def notify_matter_members(matter_id: str, ntype: str, title: str, body: str = ""
         create_notification(m["profile_id"], ntype, title, body, matter_id)
 
 
+# ── Rwanda Law Library ────────────────────────────────────────────
+
+_LAW_TABLE = "law_library"
+
+def law_library_available() -> bool:
+    try:
+        get_db().table(_LAW_TABLE).select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
+def list_laws(search: str | None = None) -> list[dict]:
+    org = _org()
+    if not org:
+        return []
+    try:
+        q = (get_db().table(_LAW_TABLE)
+             .select("id,title,reference,category,year,file_name,created_at")
+             .eq("organization_id", org))
+        if search:
+            q = q.ilike("title", f"%{search}%")
+        return (q.order("title").execute()).data or []
+    except Exception:
+        return []
+
+
+def get_law_text(law_id: str) -> str:
+    try:
+        resp = (get_db().table(_LAW_TABLE)
+                .select("full_text").eq("id", law_id).maybe_single().execute())
+        return (resp.data or {}).get("full_text", "")
+    except Exception:
+        return ""
+
+
+def save_law(title: str, full_text: str, reference: str = "", category: str = "",
+             year: int | None = None, file_name: str = "") -> bool:
+    org = _org()
+    if not org:
+        return False
+    try:
+        get_db().table(_LAW_TABLE).insert({
+            "organization_id": org,
+            "title": title, "reference": reference,
+            "category": category, "year": year,
+            "full_text": full_text, "file_name": file_name,
+            "uploaded_by": _uid(),
+        }).execute()
+        audit("LAW_UPLOADED", _LAW_TABLE, None, {"title": title})
+        return True
+    except Exception:
+        return False
+
+
+def delete_law(law_id: str) -> None:
+    try:
+        get_db().table(_LAW_TABLE).delete().eq("id", law_id).execute()
+    except Exception:
+        pass
+
+
 # ── Dashboard stats ────────────────────────────────────────────────
 
 def dashboard_stats() -> dict:
