@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, disclaimer, section, placeholder_feature, group_header
+from utils.shared.styles import slim_header, disclaimer, section, group_header
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import download_json
 
@@ -54,10 +54,15 @@ with tab1:
         score = result1.get("filing_readiness_score", 0)
         st.divider()
         score_color = "#16a34a" if score >= 80 else "#d97706" if score >= 60 else "#dc2626"
+        score_bg    = "#f0fdf4" if score >= 80 else "#fffbeb" if score >= 60 else "#fef2f2"
         s1, s2 = st.columns([1, 3])
         s1.markdown(
-            f'<div class="metric-card"><div class="val" style="color:{score_color}">{score}/100</div>'
-            f'<div class="lbl">Filing Readiness</div></div>',
+            f'<div style="background:{score_bg};border-radius:12px;padding:1.2rem;text-align:center;'
+            f'border-top:4px solid {score_color}">'
+            f'<div style="font-size:2rem;font-weight:700;color:{score_color}">{score}</div>'
+            f'<div style="font-size:.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em">out of 100</div>'
+            f'<div style="font-size:.75rem;color:{score_color};font-weight:600;margin-top:.3rem">Filing Readiness</div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
         s2.markdown(f"**Summary:** {result1.get('executive_summary','')}")
@@ -120,17 +125,31 @@ with tab2:
         if events:
             st.markdown("<br>", unsafe_allow_html=True)
             section(f"📅 Timeline ({len(events)} events)")
-            hdr = st.columns([2, 4, 2, 2])
-            for col, lbl in zip(hdr, ["Date", "Event", "Significance", "Source"]):
-                col.markdown(f"**{lbl}**")
-            st.divider()
+            SIG_COLORS = {
+                "critical":  ("#dc2626", "#fef2f2"),
+                "high":      ("#d97706", "#fffbeb"),
+                "medium":    ("#2563eb", "#eff6ff"),
+                "low":       ("#16a34a", "#f0fdf4"),
+            }
             for ev in events:
-                row = st.columns([2, 4, 2, 2])
-                row[0].markdown(f"**{ev.get('date','')}**")
-                row[1].markdown(ev.get("event",""))
-                row[2].markdown(ev.get("significance",""))
-                row[3].markdown(f'<span style="color:#94a3b8;font-size:0.8rem">{ev.get("source","")}</span>', unsafe_allow_html=True)
-                st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+                sig = (ev.get("significance") or "medium").lower()
+                fg, bg = SIG_COLORS.get(sig, ("#64748b", "#f1f5f9"))
+                st.markdown(
+                    f"""<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;
+                                  padding:.75rem 1rem;margin-bottom:.4rem;
+                                  display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+                      <div style="min-width:90px;flex-shrink:0">
+                        <div style="font-size:.78rem;font-weight:700;color:#1a2744">{ev.get('date','')}</div>
+                        <span style="font-size:.68rem;font-weight:700;color:{fg};background:{bg};
+                                     padding:.1rem .45rem;border-radius:20px;border:1px solid {fg}30">{sig.title()}</span>
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:.88rem;color:#1e293b;font-weight:500">{ev.get('event','')}</div>
+                        {f'<div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem">Source: {ev.get("source","")}</div>' if ev.get('source') else ''}
+                      </div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
         if conflicts:
             st.markdown("<br>", unsafe_allow_html=True)
             section("⚠️ Date Conflicts")
@@ -176,9 +195,30 @@ with tab3:
         st.markdown(r.get("court_overview",""))
         checklist = r.get("checklist", [])
         if checklist:
-            section(f"✅ Checklist ({len(checklist)} steps)")
             if "fc_completed" not in st.session_state:
                 st.session_state.fc_completed = set()
+
+            # Count completed from rendered checkboxes
+            completed_count = sum(
+                1 for item in checklist
+                if st.session_state.get(f"fc_chk_{item.get('step', 0)}", False)
+            )
+            progress_pct = completed_count / len(checklist) if checklist else 0
+            prog_color = "#16a34a" if progress_pct == 1 else "#2563eb" if progress_pct >= 0.5 else "#d97706"
+
+            st.markdown(
+                f'<div style="background:#f8fafc;border-radius:10px;padding:.8rem 1rem;margin-bottom:.8rem">'
+                f'<div style="display:flex;justify-content:space-between;margin-bottom:.4rem">'
+                f'<span style="font-size:.82rem;font-weight:600;color:#1a2744">Checklist Progress</span>'
+                f'<span style="font-size:.82rem;color:{prog_color};font-weight:700">{completed_count}/{len(checklist)} steps</span>'
+                f'</div>'
+                f'<div style="background:#e2e8f0;border-radius:20px;height:8px">'
+                f'<div style="background:{prog_color};height:8px;border-radius:20px;width:{progress_pct*100:.0f}%"></div>'
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
+
+            section(f"✅ Filing Checklist ({len(checklist)} steps)")
             for item in checklist:
                 step = item.get("step", 0)
                 pri_icon = {"critical": "🔴", "important": "🟡", "standard": "🟢"}.get(item.get("priority",""), "⚪")

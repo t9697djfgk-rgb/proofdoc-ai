@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, disclaimer, section, risk_badge, placeholder_feature
+from utils.shared.styles import slim_header, disclaimer, section, risk_badge
 from utils.shared.document_input import document_input_ui, two_document_input_ui
 from utils.shared.export_utils import download_json
 
@@ -57,14 +57,30 @@ with tab1:
         if red_flags:
             st.markdown("<br>", unsafe_allow_html=True)
             section(f"🚨 Red Flags ({len(red_flags)})")
+            SEV_CFG = {
+                "critical": ("#dc2626", "#fef2f2", "🔴"),
+                "high":     ("#ea580c", "#fff7ed", "🟠"),
+                "medium":   ("#d97706", "#fffbeb", "🟡"),
+                "low":      ("#059669", "#ecfdf5", "🟢"),
+            }
             for rf in red_flags:
-                row = st.columns([1.5, 3, 2, 1.5, 1])
-                row[0].markdown(rf.get("category",""))
-                row[1].markdown(rf.get("issue",""))
-                row[2].markdown(rf.get("implication",""))
-                row[3].markdown(rf.get("recommendation",""))
-                row[4].markdown(risk_badge(rf.get("severity","medium")), unsafe_allow_html=True)
-                st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+                sev = (rf.get("severity") or "medium").lower()
+                fg, bg, icon = SEV_CFG.get(sev, ("#6b7280", "#f1f5f9", "⚪"))
+                st.markdown(
+                    f"""<div style="background:{bg};border-radius:10px;padding:.85rem 1rem;
+                                  margin-bottom:.4rem;border-left:4px solid {fg}">
+                      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+                        <span>{icon}</span>
+                        <span style="font-size:.7rem;font-weight:700;color:{fg};text-transform:uppercase;
+                                     letter-spacing:.04em">{rf.get('category','')}</span>
+                        <span style="margin-left:auto">{risk_badge(sev)}</span>
+                      </div>
+                      <p style="margin:0;font-weight:600;color:#1a1a2e;font-size:.88rem">{rf.get('issue','')}</p>
+                      {f'<p style="margin:.3rem 0 0;font-size:.82rem;color:#374151"><b>Implication:</b> {rf.get("implication","")}</p>' if rf.get("implication") else ""}
+                      {f'<p style="margin:.2rem 0 0;font-size:.82rem;color:#1a2744"><b>Recommendation:</b> {rf.get("recommendation","")}</p>' if rf.get("recommendation") else ""}
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
         for m in mat: st.warning(m)
         st.markdown("<br>", unsafe_allow_html=True)
         c1, _, c3 = st.columns(3)

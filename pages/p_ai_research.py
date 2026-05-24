@@ -63,7 +63,15 @@ with tab_research:
                 st.markdown("<br>", unsafe_allow_html=True)
                 section("📚 Relevant Authorities")
                 for a in r["relevant_authorities"]:
-                    st.markdown(f"**{a.get('name','')}** `{a.get('citation','')}` — {a.get('relevance','')}")
+                    st.markdown(
+                        f'<div style="background:#f0f4ff;border-radius:8px;padding:.6rem 1rem;'
+                        f'margin-bottom:.35rem;border-left:3px solid #1a2744">'
+                        f'<span style="font-weight:700;color:#1a2744;font-size:.88rem">{a.get("name","")}</span>'
+                        f'&nbsp;<code style="font-size:.78rem;background:#e2e8f0;padding:.1rem .4rem;border-radius:4px">{a.get("citation","")}</code>'
+                        f'<div style="font-size:.82rem;color:#475569;margin-top:.25rem">{a.get("relevance","")}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
             if r.get("practical_implications"):
                 st.markdown("<br>", unsafe_allow_html=True)
                 section("💡 Practical Implications")
@@ -100,10 +108,15 @@ with tab_research:
         if st.session_state.get("csum_result"):
             r = st.session_state.csum_result
             st.divider()
-            m1, m2, m3 = st.columns(3)
-            m1.markdown(f"**Case:** {r.get('case_name','—')}")
-            m2.markdown(f"**Citation:** `{r.get('citation','—')}`")
-            m3.markdown(f"**Court:** {r.get('court','—')} · {r.get('date','')}")
+            st.markdown(
+                f'<div style="background:#f0f4ff;border-radius:12px;padding:1rem 1.2rem;margin-bottom:.8rem">'
+                f'<div style="font-size:1rem;font-weight:700;color:#1a2744">{r.get("case_name","—")}</div>'
+                f'<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:.4rem">'
+                f'<code style="font-size:.8rem;background:#e2e8f0;padding:.15rem .5rem;border-radius:4px">{r.get("citation","—")}</code>'
+                f'<span style="font-size:.8rem;color:#64748b">{r.get("court","—")} · {r.get("date","")}</span>'
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
             st.markdown(f"**Facts:** {r.get('facts','')}")
             if r.get("issues"):
                 st.markdown("**Issues Decided:**")

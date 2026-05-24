@@ -19,7 +19,14 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 
 # ── Tab 1: PDF / Image → Word ─────────────────────────────────────
 with tab1:
-    st.markdown("Upload a scanned PDF or image — Claude Opus 4.7 reads every page and produces an editable Word document.")
+    st.markdown(
+        '<div style="background:linear-gradient(135deg,#f0f4ff,#f8fafc);border:1px solid #c7d2fe;'
+        'border-radius:10px;padding:.85rem 1.1rem;margin-bottom:1rem">'
+        '🤖 <b>AI-Powered Reconstruction</b> — Claude Opus 4.7 reads every page of your scanned document '
+        'and produces a fully editable, structure-preserving Word file. Works on handwritten, low-quality, '
+        'and multi-page scans.</div>',
+        unsafe_allow_html=True,
+    )
 
     doc_type = st.selectbox("Document type", [
         "legal", "contract", "court_filing", "deed", "invoice", "report", "letter", "general",

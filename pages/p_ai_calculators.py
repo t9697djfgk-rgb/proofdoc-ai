@@ -83,16 +83,30 @@ with calc1:
         # Timeline display
         section("📅 Deadline Timeline")
         milestones = [
-            (trigger_date, "🟢 Trigger Date"),
-            (trigger_date + timedelta(days=max(1, additional_days // 4)), f"25% mark"),
-            (trigger_date + timedelta(days=max(1, additional_days // 2)), f"50% mark"),
-            (deadline_date - timedelta(days=max(1, additional_days // 7)), "⚠️ 1 week warning"),
-            (deadline_date, "🔴 DEADLINE"),
+            (trigger_date, "Trigger Date", "#16a34a"),
+            (trigger_date + timedelta(days=max(1, additional_days // 4)), "25% mark", "#64748b"),
+            (trigger_date + timedelta(days=max(1, additional_days // 2)), "50% mark", "#64748b"),
+            (deadline_date - timedelta(days=max(1, additional_days // 7)), "1 week warning", "#d97706"),
+            (deadline_date, "DEADLINE", "#dc2626"),
         ]
-        for d_date, label in milestones:
+        for d_date, label, color in milestones:
             remaining = (d_date - today).days
-            status = "✅ Passed" if remaining < 0 else (f"⚠️ {remaining}d" if remaining <= 7 else f"{remaining}d")
-            st.markdown(f"**{d_date.strftime('%d %b %Y')}** — {label}  ·  {status}")
+            if remaining < 0:
+                status_txt, status_color = "✅ Passed", "#16a34a"
+            elif remaining <= 7:
+                status_txt, status_color = f"⚠️ {remaining}d", "#dc2626"
+            else:
+                status_txt, status_color = f"{remaining}d remaining", "#64748b"
+            st.markdown(
+                f'<div style="background:white;border:1px solid #e2e8f0;border-radius:8px;'
+                f'padding:.55rem 1rem;margin-bottom:.3rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">'
+                f'<div style="width:10px;height:10px;background:{color};border-radius:50%;flex-shrink:0"></div>'
+                f'<span style="font-weight:700;color:#1a2744;font-size:.85rem">{d_date.strftime("%d %b %Y")}</span>'
+                f'<span style="font-size:.82rem;color:#475569">{label}</span>'
+                f'<span style="margin-left:auto;font-size:.8rem;font-weight:600;color:{status_color}">{status_txt}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
         # Export
         st.markdown("<br>", unsafe_allow_html=True)
@@ -285,18 +299,25 @@ with fin2:
 
         st.divider()
         section("📋 Schedule of Loss")
-        hdr = st.columns([3, 1.5, 2, 0.5])
-        for col, lbl in zip(hdr, ["Head of Loss", "Amount (£)", "Notes", ""]):
-            col.markdown(f"**{lbl}**")
-        st.divider()
         for i, item in enumerate(st.session_state.damages_items):
-            row = st.columns([3, 1.5, 2, 0.5])
-            row[0].text(item["head"])
-            row[1].text(f"£{item['amount']:,.2f}")
-            row[2].text(item["notes"] or "—")
-            if row[3].button("🗑️", key=f"del_d_{i}"):
-                st.session_state.damages_items.pop(i)
-                st.rerun()
+            del_col, card_col = st.columns([0.08, 0.92])
+            with card_col:
+                notes_html = f'<span style="font-size:.78rem;color:#64748b">{item["notes"]}</span>' if item.get("notes") else ""
+                st.markdown(
+                    f'<div style="background:#f8fafc;border-radius:8px;padding:.6rem 1rem;'
+                    f'margin-bottom:.3rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;'
+                    f'border-left:3px solid #c9a84c">'
+                    f'<span style="flex:1;font-size:.85rem;color:#1a2744;font-weight:500">{item["head"]}</span>'
+                    f'{notes_html}'
+                    f'<span style="font-weight:700;color:#1a2744;font-size:.9rem;flex-shrink:0">£{item["amount"]:,.2f}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with del_col:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🗑️", key=f"del_d_{i}"):
+                    st.session_state.damages_items.pop(i)
+                    st.rerun()
 
         st.divider()
         m1, m2, m3, m4 = st.columns(4)

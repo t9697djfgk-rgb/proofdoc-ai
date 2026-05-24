@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, disclaimer, section, placeholder_feature
+from utils.shared.styles import slim_header, disclaimer, section
 from utils.shared.export_utils import action_row, download_json
 
 from utils.auth import require_lawyer

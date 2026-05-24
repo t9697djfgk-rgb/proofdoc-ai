@@ -1,8 +1,6 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import (
-    slim_header, disclaimer, section, risk_badge, placeholder_feature,
-)
+from utils.shared.styles import slim_header, disclaimer, section, risk_badge
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import action_row, download_json, download_txt
 
@@ -61,21 +59,38 @@ with tab1:
         if edits:
             st.markdown("<br>", unsafe_allow_html=True)
             section(f"📝 Suggested Edits ({len(edits)})")
-            hdr = st.columns([2.5, 2.5, 1.5, 1, 3])
-            for col, lbl in zip(hdr, ["Original", "Correction", "Issue Type", "Risk", "Explanation"]):
-                col.markdown(f"**{lbl}**")
-            st.divider()
+            RISK_CFG = {
+                "high":   ("#dc2626", "#fef2f2"),
+                "medium": ("#d97706", "#fffbeb"),
+                "low":    ("#16a34a", "#f0fdf4"),
+            }
             for edit in edits:
                 risk = edit.get("risk_level", "low").lower()
-                risk_cls = {"high": "risk-high", "medium": "risk-medium"}.get(risk, "risk-low")
+                fg, bg = RISK_CFG.get(risk, ("#64748b", "#f1f5f9"))
                 issue = edit.get("issue_type", "").replace("_", " ").title()
-                row = st.columns([2.5, 2.5, 1.5, 1, 3])
-                row[0].markdown(f'<span style="color:#64748b">{edit.get("original_text","")}</span>', unsafe_allow_html=True)
-                row[1].markdown(f'**{edit.get("suggested_correction","")}**')
-                row[2].markdown(f'<span class="issue-badge">{issue}</span>', unsafe_allow_html=True)
-                row[3].markdown(f'<span class="{risk_cls}">{risk.title()}</span>', unsafe_allow_html=True)
-                row[4].markdown(edit.get("explanation", ""))
-                st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+                st.markdown(
+                    f"""<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;
+                                  padding:.8rem 1rem;margin-bottom:.4rem;border-left:4px solid {fg}">
+                      <div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:.45rem">
+                        <span style="font-size:.7rem;font-weight:700;color:{fg};background:{bg};
+                                     padding:.15rem .55rem;border-radius:20px;border:1px solid {fg}30">{risk.title()} Risk</span>
+                        <span style="font-size:.72rem;background:#f1f5f9;color:#475569;
+                                     padding:.15rem .5rem;border-radius:20px">{issue}</span>
+                      </div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.4rem">
+                        <div style="background:#fef2f2;border-radius:6px;padding:.4rem .7rem">
+                          <div style="font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem">Original</div>
+                          <div style="font-size:.84rem;color:#dc2626">{edit.get("original_text","")}</div>
+                        </div>
+                        <div style="background:#f0fdf4;border-radius:6px;padding:.4rem .7rem">
+                          <div style="font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.15rem">Correction</div>
+                          <div style="font-size:.84rem;color:#16a34a;font-weight:600">{edit.get("suggested_correction","")}</div>
+                        </div>
+                      </div>
+                      <div style="font-size:.82rem;color:#475569">{edit.get("explanation","")}</div>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
         if revised:
             st.markdown("<br>", unsafe_allow_html=True)
             section("📄 Clean Revised Version")
@@ -125,13 +140,28 @@ with tab2:
         tabs_r = st.tabs(["🚨 Risks", "❌ Missing Clauses", "💬 Negotiation Points", "✅ Strengths"])
         with tabs_r[0]:
             if risks:
+                SEV_CFG = {
+                    "critical": ("#dc2626", "#fef2f2", "🔴"),
+                    "high":     ("#ea580c", "#fff7ed", "🟠"),
+                    "medium":   ("#d97706", "#fffbeb", "🟡"),
+                    "low":      ("#059669", "#ecfdf5", "🟢"),
+                }
                 for r in risks:
-                    row = st.columns([2, 4, 2, 1])
-                    row[0].markdown(f"**{r.get('clause','')}**")
-                    row[1].markdown(r.get("risk",""))
-                    row[2].markdown(r.get("recommendation",""))
-                    row[3].markdown(risk_badge(r.get("severity","medium")), unsafe_allow_html=True)
-                    st.markdown('<hr style="margin:0.25rem 0;border-color:#f1f5f9">', unsafe_allow_html=True)
+                    sev = (r.get("severity") or "medium").lower()
+                    fg, bg, icon = SEV_CFG.get(sev, ("#6b7280", "#f1f5f9", "⚪"))
+                    st.markdown(
+                        f"""<div style="background:{bg};border-radius:10px;padding:.85rem 1rem;
+                                      margin-bottom:.4rem;border-left:4px solid {fg}">
+                          <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+                            <span>{icon}</span>
+                            <span style="font-weight:700;color:#1a2744;font-size:.88rem">{r.get('clause','')}</span>
+                            <span style="margin-left:auto">{risk_badge(sev)}</span>
+                          </div>
+                          <p style="margin:0 0 .3rem;font-size:.84rem;color:#334155">{r.get('risk','')}</p>
+                          {f'<p style="margin:0;font-size:.8rem;color:#1a2744"><b>→</b> {r.get("recommendation","")}</p>' if r.get("recommendation") else ""}
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
             else:
                 st.success("No significant risks found.")
         with tabs_r[1]:
