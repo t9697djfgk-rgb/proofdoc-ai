@@ -281,6 +281,11 @@ with tab_invoices:
                 if inv_notes.strip():
                     lines += ["", f"Notes: {inv_notes}"]
                 st.session_state.inv_preview = "\n".join(lines)
+                st.session_state.inv_data = {
+                    "ref": inv_ref, "client": inv_client,
+                    "subtotal": total_fees, "vat_amt": vat_amt,
+                    "total": total_incl, "terms": inv_terms, "notes": inv_notes,
+                }
                 st.rerun()
         else:
             st.info("No unbilled time entries for this matter.")
@@ -297,7 +302,7 @@ with tab_invoices:
             </div>""",
             unsafe_allow_html=True,
         )
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         c1.download_button(
             "⬇️ Download (.txt)", st.session_state.inv_preview,
             "invoice.txt", "text/plain", use_container_width=True, key="inv_dl",
@@ -308,9 +313,133 @@ with tab_invoices:
                 "📄 Download (.pdf)", st.session_state.inv_preview,
                 "invoice.pdf", title="Invoice", key="inv_dl_pdf",
             )
-        if c3.button("🗑️ Clear", use_container_width=True, key="inv_clr"):
+        if c3.button("✅ Mark as Billed", type="primary", use_container_width=True, key="inv_mark_billed"):
+            if selected_mid:
+                n = db.mark_entries_billed(selected_mid)
+                # Save invoice record to DB so client can see it
+                _inv_data = st.session_state.get("inv_data", {})
+                db.create_invoice(
+                    matter_id=selected_mid,
+                    invoice_number=_inv_data.get("ref", ""),
+                    client_name=_inv_data.get("client", ""),
+                    invoice_text=st.session_state.inv_preview,
+                    subtotal=_inv_data.get("subtotal", 0),
+                    vat_amount=_inv_data.get("vat_amt", 0),
+                    total_amount=_inv_data.get("total", 0),
+                    terms=_inv_data.get("terms", ""),
+                    notes=_inv_data.get("notes", ""),
+                )
+                # Notify matter members
+                db.notify_matter_members(
+                    selected_mid, "invoice_ready",
+                    f"Invoice {_inv_data.get('ref','')} issued",
+                    body=f"Total: £{_inv_data.get('total', 0):,.2f}",
+                )
+                st.success(f"✅ {n} entries marked as billed. Invoice saved.")
+                st.session_state.pop("inv_preview", None)
+                st.session_state.pop("inv_data", None)
+                st.rerun()
+        if c4.button("🗑️ Clear", use_container_width=True, key="inv_clr"):
             st.session_state.pop("inv_preview", None)
+            st.session_state.pop("inv_data", None)
             st.rerun()
+
+        st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+        with st.expander("📧 Email invoice to client"):
+            _inv_data2 = st.session_state.get("inv_data", {})
+            _email_to = st.text_input("Client email address", key="inv_email_to",
+                                       placeholder="client@example.com")
+            if st.button("Send Invoice by Email", type="primary", key="inv_email_send"):
+                if not _email_to.strip():
+                    st.warning("Enter a client email address.")
+                else:
+                    from utils.email_utils import send_email
+                    _matter = db.get_matter(selected_mid) if selected_mid else {}
+                    _ref = _inv_data2.get("ref", "Invoice")
+                    _subj = f"[{_matter.get('ref','')}] Invoice {_ref}"
+                    _html = (
+                        f"<div style='font-family:sans-serif;max-width:580px;margin:auto'>"
+                        f"<div style='background:#1a2744;color:white;padding:1rem 1.5rem;"
+                        f"border-radius:8px 8px 0 0'><h2 style='margin:0'>⚖️ eLawFirm Invoice</h2></div>"
+                        f"<div style='background:#fff;padding:1.5rem;border:1px solid #e5e7eb;"
+                        f"border-top:none;border-radius:0 0 8px 8px'>"
+                        f"<p>Dear {_inv_data2.get('client','Client')},</p>"
+                        f"<p>Please find below your invoice <strong>{_ref}</strong> for matter "
+                        f"<strong>{_matter.get('ref','')} — {_matter.get('title','')}</strong>.</p>"
+                        f"<pre style='background:#f8fafc;padding:1rem;border-radius:6px;"
+                        f"font-size:0.82rem;overflow-x:auto'>{st.session_state.get('inv_preview','')}</pre>"
+                        f"<p style='color:#6b7280;font-size:0.85rem'>Payment terms: "
+                        f"{_inv_data2.get('terms','Payment due within 30 days')}</p>"
+                        f"</div></div>"
+                    )
+                    ok = send_email(_email_to.strip(), _subj, st.session_state.get("inv_preview",""), _html)
+                    if ok:
+                        st.success(f"✅ Invoice emailed to {_email_to.strip()}")
+                    else:
+                        st.warning("Email not configured. Download the PDF and send manually. "
+                                   "(Add SMTP credentials to .streamlit/secrets.toml)")
+
+    # ── Saved Invoices ──────────────────────────────────────────────
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+    section("🗂️ Saved Invoices")
+    _saved_invs = db.list_invoices(selected_mid if selected_mid else None)
+    if _saved_invs:
+        _INV_STATUS_CFG = {
+            "sent":     ("#2563eb", "#eff6ff", "Sent"),
+            "approved": ("#16a34a", "#f0fdf4", "Approved"),
+            "queried":  ("#d97706", "#fffbeb", "Queried"),
+            "paid":     ("#7c3aed", "#f5f3ff", "Paid"),
+            "draft":    ("#64748b", "#f8fafc", "Draft"),
+        }
+        for inv in _saved_invs:
+            _s = inv.get("status", "draft")
+            _fg, _bg, _lbl = _INV_STATUS_CFG.get(_s, ("#64748b", "#f8fafc", _s.title()))
+            _inv_cols = st.columns([3, 1.5, 1.5, 1.5, 1])
+            _inv_cols[0].markdown(
+                f"**{inv.get('invoice_number','—')}** — {inv.get('client_name','—')[:30]}"
+            )
+            _inv_cols[1].caption(str(inv.get("issued_date",""))[:10])
+            _inv_cols[2].markdown(
+                f"**£{inv.get('total_amount',0):,.2f}**"
+            )
+            _inv_cols[3].markdown(
+                f'<span style="background:{_bg};color:{_fg};font-size:.72rem;font-weight:600;'
+                f'padding:.15rem .5rem;border-radius:20px">{_lbl}</span>',
+                unsafe_allow_html=True,
+            )
+            if _inv_cols[4].button("👁️", key=f"inv_view_{inv['id']}", help="View invoice text"):
+                st.session_state[f"inv_show_{inv['id']}"] = not st.session_state.get(f"inv_show_{inv['id']}", False)
+                st.rerun()
+            if st.session_state.get(f"inv_show_{inv['id']}"):
+                st.markdown(
+                    f"<pre style='background:#f8fafc;border-radius:8px;padding:1rem;"
+                    f"font-size:.78rem;overflow-x:auto'>{inv.get('invoice_text','')}</pre>",
+                    unsafe_allow_html=True,
+                )
+    elif not db.invoices_available():
+        st.info("💡 Run the Supabase SQL below to enable invoice storage:")
+        st.code(
+            "CREATE TABLE invoices (\n"
+            "  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+            "  organization_id text NOT NULL,\n"
+            "  matter_id uuid REFERENCES matters(id),\n"
+            "  invoice_number text,\n"
+            "  client_name text,\n"
+            "  invoice_text text,\n"
+            "  subtotal numeric DEFAULT 0,\n"
+            "  vat_amount numeric DEFAULT 0,\n"
+            "  total_amount numeric DEFAULT 0,\n"
+            "  terms text,\n"
+            "  notes text,\n"
+            "  status text DEFAULT 'sent',\n"
+            "  issued_date date,\n"
+            "  created_by uuid,\n"
+            "  created_at timestamptz DEFAULT now()\n"
+            ");",
+            language="sql",
+        )
+    else:
+        st.caption("No invoices saved yet.")
 
 # ══════════════════════════════════════════════════════════════════
 # TAB 4 – REPORTS

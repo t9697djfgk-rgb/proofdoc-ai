@@ -291,17 +291,74 @@ with tab_disc:
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════════
-# TAB 5 – BILLING (read-only)
+# TAB 5 – BILLING
 # ══════════════════════════════════════════════════════════════════
 with tab_billing:
-    section("💼 Billing Summary")
-    st.markdown(
-        '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;'
-        'padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.85rem">'
-        'ℹ️ This shows time recorded against your matters. For invoices or billing queries, '
-        'please contact your lawyer.</div>',
-        unsafe_allow_html=True,
-    )
+    section("🧾 Invoices")
+
+    _inv_status_cfg = {
+        "sent":     ("#2563eb", "#eff6ff", "Awaiting Approval"),
+        "approved": ("#16a34a", "#f0fdf4", "Approved"),
+        "queried":  ("#d97706", "#fffbeb", "Queried"),
+        "paid":     ("#7c3aed", "#f5f3ff", "Paid"),
+        "draft":    ("#64748b", "#f8fafc", "Draft"),
+    }
+
+    _all_invs = db.list_invoices()
+    if _all_invs:
+        for _inv in _all_invs:
+            _s = _inv.get("status", "sent")
+            _fg, _bg, _slbl = _inv_status_cfg.get(_s, ("#64748b", "#f8fafc", _s.title()))
+            _inv_key = _inv["id"]
+            _ic1, _ic2, _ic3, _ic4, _ic5 = st.columns([2.5, 1.5, 1.5, 1.5, 1.5])
+            _ic1.markdown(f"**{_inv.get('invoice_number','—')}**")
+            _ic2.caption(str(_inv.get("issued_date",""))[:10])
+            _ic3.markdown(f"**£{_inv.get('total_amount',0):,.2f}**")
+            _ic4.markdown(
+                f'<span style="background:{_bg};color:{_fg};font-size:.72rem;font-weight:600;'
+                f'padding:.15rem .5rem;border-radius:20px">{_slbl}</span>',
+                unsafe_allow_html=True,
+            )
+            if _s == "sent":
+                _ba, _bq = _ic5.columns(2)
+                if _ba.button("✅", key=f"inv_approve_{_inv_key}", help="Approve invoice"):
+                    db.update_invoice_status(_inv_key, "approved")
+                    db.notify_matter_members(
+                        _inv.get("matter_id",""),
+                        "invoice_ready",
+                        f"Invoice {_inv.get('invoice_number','')} approved by client",
+                        body=f"Approved by {user['full_name']}",
+                    )
+                    st.success("Invoice approved.")
+                    st.rerun()
+                if _bq.button("❓", key=f"inv_query_{_inv_key}", help="Query invoice"):
+                    db.update_invoice_status(_inv_key, "queried")
+                    db.notify_matter_members(
+                        _inv.get("matter_id",""),
+                        "invoice_ready",
+                        f"Invoice {_inv.get('invoice_number','')} queried by client",
+                        body=f"Queried by {user['full_name']} — please contact your lawyer",
+                    )
+                    st.info("Query raised. Your lawyer will be in touch.")
+                    st.rerun()
+
+            if st.session_state.get(f"inv_expand_{_inv_key}"):
+                st.markdown(
+                    f"<pre style='background:#f8fafc;border-radius:8px;padding:1rem;"
+                    f"font-size:.78rem;overflow-x:auto;margin-top:.4rem'>"
+                    f"{_inv.get('invoice_text','')}</pre>",
+                    unsafe_allow_html=True,
+                )
+            if st.button("👁 View", key=f"inv_tog_{_inv_key}", use_container_width=False):
+                _k = f"inv_expand_{_inv_key}"
+                st.session_state[_k] = not st.session_state.get(_k, False)
+                st.rerun()
+            st.divider()
+    else:
+        st.info("No invoices have been issued yet. Your lawyer will send invoices here for your review.")
+
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+    section("💼 Time Summary")
     matters_b = db.list_matters()
     if matters_b:
         _all_entries = []

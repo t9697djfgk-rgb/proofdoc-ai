@@ -662,6 +662,202 @@ def dashboard_stats() -> dict:
     }
 
 
+# ── Mark entries billed ───────────────────────────────────────────
+
+def mark_entries_billed(matter_id: str) -> int:
+    """Mark all unbilled time entries for a matter as billed. Returns count updated."""
+    org = _org()
+    if not org:
+        return 0
+    try:
+        result = (
+            get_db().table("time_entries")
+            .update({"billed": True})
+            .eq("organization_id", org)
+            .eq("matter_id", matter_id)
+            .eq("billed", False)
+            .execute()
+        )
+        return len(result.data or [])
+    except Exception:
+        return 0
+
+
+# ── Billing analytics ─────────────────────────────────────────────
+
+def billing_analytics() -> dict:
+    """Revenue this month, WIP, top matters by value."""
+    org = _org()
+    if not org:
+        return {}
+    try:
+        from datetime import datetime
+        entries = (
+            get_db().table("time_entries").select("*")
+            .eq("organization_id", org).execute()
+        ).data or []
+        today = date.today()
+        month_start = today.replace(day=1).isoformat()
+        rev_month = sum(
+            e["hours"] * (e.get("rate") or 0)
+            for e in entries
+            if e.get("billed") and str(e.get("entry_date", "") or "")[:7] == today.isoformat()[:7]
+        )
+        wip = sum(
+            e["hours"] * (e.get("rate") or 0)
+            for e in entries if not e.get("billed")
+        )
+        total_rev = sum(e["hours"] * (e.get("rate") or 0) for e in entries if e.get("billed"))
+
+        matters_val: dict = {}
+        for e in entries:
+            mid = e.get("matter_id") or "general"
+            matters_val.setdefault(mid, 0)
+            matters_val[mid] += e["hours"] * (e.get("rate") or 0)
+
+        matters_meta = {m["id"]: m for m in (
+            get_db().table("matters").select("id,ref,title,status,matter_type")
+            .eq("organization_id", org).execute()
+        ).data or []}
+
+        by_status: dict = {}
+        by_type: dict = {}
+        for m in matters_meta.values():
+            s = m.get("status", "Unknown")
+            t = m.get("matter_type", "Other") or "Other"
+            by_status[s] = by_status.get(s, 0) + 1
+            by_type[t]   = by_type.get(t, 0) + 1
+
+        top_matters = sorted(
+            [(mid, val) for mid, val in matters_val.items()],
+            key=lambda x: -x[1]
+        )[:5]
+        top_matters_enriched = [
+            {
+                "id": mid,
+                "ref":   matters_meta.get(mid, {}).get("ref", "—"),
+                "title": matters_meta.get(mid, {}).get("title", "General")[:35],
+                "value": val,
+            }
+            for mid, val in top_matters
+        ]
+        return {
+            "revenue_month": rev_month,
+            "wip": wip,
+            "total_revenue": total_rev,
+            "by_status": by_status,
+            "by_type": by_type,
+            "top_matters": top_matters_enriched,
+        }
+    except Exception:
+        return {}
+
+
+# ── Invoices ──────────────────────────────────────────────────────
+
+_INV_TABLE = "invoices"
+
+def invoices_available() -> bool:
+    try:
+        get_db().table(_INV_TABLE).select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
+def create_invoice(matter_id: str, invoice_number: str, client_name: str,
+                   invoice_text: str, subtotal: float, vat_amount: float,
+                   total_amount: float, terms: str = "", notes: str = "") -> dict | None:
+    org = _org()
+    if not org:
+        return None
+    try:
+        result = get_db().table(_INV_TABLE).insert({
+            "organization_id": org,
+            "matter_id": matter_id,
+            "invoice_number": invoice_number,
+            "client_name": client_name,
+            "invoice_text": invoice_text,
+            "subtotal": subtotal,
+            "vat_amount": vat_amount,
+            "total_amount": total_amount,
+            "terms": terms,
+            "notes": notes,
+            "status": "sent",
+            "issued_date": str(date.today()),
+            "created_by": _uid(),
+        }).execute()
+        return (result.data or [{}])[0]
+    except Exception:
+        return None
+
+
+def list_invoices(matter_id: str | None = None) -> list[dict]:
+    org = _org()
+    if not org:
+        return []
+    try:
+        q = get_db().table(_INV_TABLE).select("*").eq("organization_id", org)
+        if matter_id:
+            q = q.eq("matter_id", matter_id)
+        return (q.order("issued_date", desc=True).execute()).data or []
+    except Exception:
+        return []
+
+
+def update_invoice_status(invoice_id: str, status: str) -> None:
+    try:
+        get_db().table(_INV_TABLE).update({"status": status}).eq("id", invoice_id).execute()
+    except Exception:
+        pass
+
+
+# ── Document versions ─────────────────────────────────────────────
+
+_VER_TABLE = "document_versions"
+
+def doc_versions_available() -> bool:
+    try:
+        get_db().table(_VER_TABLE).select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
+def add_document_version(doc_id: str, version_number: int, name: str = "",
+                          notes: str = "", file_type: str = "",
+                          file_size: int | None = None) -> dict | None:
+    org = _org()
+    if not org:
+        return None
+    try:
+        result = get_db().table(_VER_TABLE).insert({
+            "organization_id": org,
+            "document_id": doc_id,
+            "version_number": version_number,
+            "name": name,
+            "notes": notes,
+            "file_type": file_type,
+            "file_size": file_size,
+            "uploaded_by": _uid(),
+        }).execute()
+        return (result.data or [{}])[0]
+    except Exception:
+        return None
+
+
+def list_document_versions(doc_id: str) -> list[dict]:
+    try:
+        return (
+            get_db().table(_VER_TABLE).select("*")
+            .eq("document_id", doc_id)
+            .order("version_number", desc=True)
+            .execute()
+        ).data or []
+    except Exception:
+        return []
+
+
 # ── Audit log ──────────────────────────────────────────────────────
 
 def audit(action: str, resource_type: str = "", resource_id: str | None = None,

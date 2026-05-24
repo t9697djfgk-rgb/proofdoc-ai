@@ -202,7 +202,7 @@ with tab_matters:
                     STATUS_MAP = {"pending": 0, "in_progress": 1, "completed": 2, "cancelled": 3}
                     STATUS_OPTS = ["pending", "in_progress", "completed", "cancelled"]
                     for t in tasks:
-                        tc = st.columns([3, 1, 1, 1.5, 0.5])
+                        tc = st.columns([3, 1, 1, 1.5, 0.5, 0.5])
                         tc[0].text(t["title"])
                         tc[1].text((t.get("priority") or "").title())
                         tc[2].text(str(t.get("due_date") or "—")[:10])
@@ -213,7 +213,26 @@ with tab_matters:
                         if new_s != curr:
                             db.update_task(t["id"], status=new_s)
                             st.rerun()
-                        if tc[4].button("🗑️", key=f"del_t_{t['id']}"):
+                        if tc[4].button("📧", key=f"remind_{t['id']}", help="Send reminder"):
+                            _assigned_id = t.get("assigned_to")
+                            _due = str(t.get("due_date",""))[:10]
+                            if _assigned_id:
+                                _prof = db.get_profile(_assigned_id)
+                                if _prof and _prof.get("email"):
+                                    from utils.email_utils import notify_user_email
+                                    notify_user_email(
+                                        to_email=_prof["email"],
+                                        notification_type="task_assigned",
+                                        title=f"Reminder: {t['title']}",
+                                        body=f"This task is due {_due}. Matter: {matter.get('ref','')} — {matter.get('title','')}",
+                                        matter_ref=matter.get("ref",""),
+                                    )
+                                    st.toast(f"Reminder sent to {_prof.get('full_name','assignee')}", icon="📧")
+                                else:
+                                    st.toast("Assignee has no email address configured.", icon="⚠️")
+                            else:
+                                st.toast("No assignee on this task.", icon="⚠️")
+                        if tc[5].button("🗑️", key=f"del_t_{t['id']}"):
                             db.delete_task(t["id"])
                             st.rerun()
 

@@ -129,8 +129,9 @@ st.markdown(
 )
 
 # ── Load data ─────────────────────────────────────────────────────
-stats  = db.dashboard_stats()
-notifs = db.list_notifications(limit=8)
+stats   = db.dashboard_stats()
+billing = db.billing_analytics()
+notifs  = db.list_notifications(limit=8)
 
 active_matters  = stats.get("active_matters", 0)
 total_clients   = stats.get("total_clients",  0)
@@ -141,34 +142,114 @@ overdue_list    = stats.get("overdue_task_list", [])
 upcoming_tasks  = stats.get("upcoming_tasks", [])
 recent_activity = stats.get("recent_activity", [])
 
-# ── KPI Cards ─────────────────────────────────────────────────────
-CARDS = [
-    ("⚖️",  "Active Matters",  active_matters, "#1a2744", "#e8f0fe", None),
-    ("👥",  "Clients",         total_clients,  "#059669", "#ecfdf5", None),
-    ("📋",  "Pending Tasks",   pending_tasks,  "#d97706", "#fffbeb", None),
-    ("⚠️",  "Overdue Tasks",   overdue_tasks,  "#dc2626", "#fef2f2", f"Needs attention" if overdue_tasks else "All on track"),
+rev_month = billing.get("revenue_month", 0)
+wip       = billing.get("wip", 0)
+
+# ── KPI Cards (6 cards: 3+3) ──────────────────────────────────────
+CARDS_ROW1 = [
+    ("⚖️", "Active Matters", active_matters, "#1a2744", "#e8f0fe", None),
+    ("👥", "Clients",        total_clients,  "#059669", "#ecfdf5", None),
+    ("📋", "Pending Tasks",  pending_tasks,  "#d97706", "#fffbeb", None),
+]
+CARDS_ROW2 = [
+    ("⚠️", "Overdue Tasks",     overdue_tasks,                  "#dc2626", "#fef2f2",
+     "Needs attention" if overdue_tasks else "All on track"),
+    ("💰", "Revenue This Month", f"£{rev_month:,.0f}",          "#7c3aed", "#f5f3ff", None),
+    ("⏳", "WIP (Unbilled)",     f"£{wip:,.0f}",                "#0891b2", "#ecfeff", None),
 ]
 
-cols = st.columns(4, gap="small")
-for col, (icon, label, value, color, bg, note) in zip(cols, CARDS):
-    note_html = f'<p style="margin:0;font-size:0.72rem;color:{color};opacity:0.85">{note}</p>' if note else ""
-    col.markdown(
-        f"""
-        <div style="background:{bg};border-radius:14px;padding:1.1rem 1.25rem;
-                    border-left:4px solid {color};box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
-            <span style="font-size:1.3rem">{icon}</span>
-            <span style="font-size:0.78rem;font-weight:600;color:#6b7280;text-transform:uppercase;
-                         letter-spacing:0.05em">{label}</span>
-          </div>
-          <p style="margin:0;font-size:2rem;font-weight:700;color:{color};line-height:1">{value}</p>
-          {note_html}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+for row in [CARDS_ROW1, CARDS_ROW2]:
+    cols = st.columns(3, gap="small")
+    for col, (icon, label, value, color, bg, note) in zip(cols, row):
+        note_html = f'<p style="margin:0;font-size:0.72rem;color:{color};opacity:0.85">{note}</p>' if note else ""
+        col.markdown(
+            f"""
+            <div style="background:{bg};border-radius:14px;padding:1.1rem 1.25rem;
+                        border-left:4px solid {color};box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
+                <span style="font-size:1.3rem">{icon}</span>
+                <span style="font-size:0.78rem;font-weight:600;color:#6b7280;text-transform:uppercase;
+                             letter-spacing:0.05em">{label}</span>
+              </div>
+              <p style="margin:0;font-size:2rem;font-weight:700;color:{color};line-height:1">{value}</p>
+              {note_html}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
-st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+
+# ── Analytics Strip ────────────────────────────────────────────────
+_by_status = billing.get("by_status", {})
+_by_type   = billing.get("by_type", {})
+_top_m     = billing.get("top_matters", [])
+if _by_status or _top_m:
+    with st.expander("📊 Practice Analytics", expanded=False):
+        _ac1, _ac2, _ac3 = st.columns(3, gap="large")
+
+        with _ac1:
+            st.markdown(
+                '<p style="font-size:0.75rem;font-weight:700;color:#1a2744;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:0.5rem">📁 Matters by Status</p>',
+                unsafe_allow_html=True,
+            )
+            _S_COLORS = {"Active": "#16a34a", "On Hold": "#d97706", "Closed": "#64748b", "Archived": "#94a3b8"}
+            _total_m = sum(_by_status.values()) or 1
+            for _s, _cnt in sorted(_by_status.items(), key=lambda x: -x[1]):
+                _pct = _cnt / _total_m * 100
+                _sc = _S_COLORS.get(_s, "#6b7280")
+                st.markdown(
+                    f'<div style="margin-bottom:.35rem">'
+                    f'<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.15rem">'
+                    f'<span style="color:#374151">{_s}</span><span style="font-weight:600;color:{_sc}">{_cnt}</span></div>'
+                    f'<div style="background:#f1f5f9;border-radius:4px;height:6px">'
+                    f'<div style="background:{_sc};width:{_pct:.0f}%;height:6px;border-radius:4px"></div></div></div>',
+                    unsafe_allow_html=True,
+                )
+
+        with _ac2:
+            st.markdown(
+                '<p style="font-size:0.75rem;font-weight:700;color:#1a2744;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:0.5rem">⚖️ Matters by Type</p>',
+                unsafe_allow_html=True,
+            )
+            _total_t = sum(_by_type.values()) or 1
+            for _t, _cnt in sorted(_by_type.items(), key=lambda x: -x[1])[:6]:
+                _pct = _cnt / _total_t * 100
+                st.markdown(
+                    f'<div style="margin-bottom:.35rem">'
+                    f'<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.15rem">'
+                    f'<span style="color:#374151">{_t[:22]}</span><span style="font-weight:600;color:#1a2744">{_cnt}</span></div>'
+                    f'<div style="background:#f1f5f9;border-radius:4px;height:6px">'
+                    f'<div style="background:#c9a84c;width:{_pct:.0f}%;height:6px;border-radius:4px"></div></div></div>',
+                    unsafe_allow_html=True,
+                )
+
+        with _ac3:
+            st.markdown(
+                '<p style="font-size:0.75rem;font-weight:700;color:#1a2744;text-transform:uppercase;'
+                'letter-spacing:0.05em;margin-bottom:0.5rem">💰 Top Matters by Value</p>',
+                unsafe_allow_html=True,
+            )
+            if _top_m:
+                _max_v = max((m["value"] for m in _top_m), default=1) or 1
+                for _tm in _top_m:
+                    _pct = _tm["value"] / _max_v * 100
+                    st.markdown(
+                        f'<div style="margin-bottom:.35rem">'
+                        f'<div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.15rem">'
+                        f'<span style="color:#374151">{_tm["ref"]} {_tm["title"][:18]}</span>'
+                        f'<span style="font-weight:600;color:#059669">£{_tm["value"]:,.0f}</span></div>'
+                        f'<div style="background:#f1f5f9;border-radius:4px;height:6px">'
+                        f'<div style="background:#059669;width:{_pct:.0f}%;height:6px;border-radius:4px"></div></div></div>',
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.caption("Log time entries to see revenue data.")
+
+st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
 # ── Main two-column layout ────────────────────────────────────────
 left, right = st.columns([3, 2], gap="large")

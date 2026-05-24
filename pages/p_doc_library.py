@@ -89,6 +89,8 @@ with tab_all:
         st.markdown("<br>", unsafe_allow_html=True)
         st.caption(f"{len(docs)} document{'s' if len(docs) != 1 else ''}")
 
+        _vers_avail = db.doc_versions_available()
+
         # Document cards
         for doc in docs:
             vis = doc.get("visibility", "internal")
@@ -108,16 +110,29 @@ with tab_all:
             fsize = doc.get("file_size")
             size_str = f"{fsize // 1024} KB" if fsize and fsize >= 1024 else (f"{fsize} B" if fsize else "")
 
+            # Version count badge
+            if _vers_avail:
+                _versions = db.list_document_versions(doc["id"])
+                _ver_badge = (
+                    f'<span style="font-size:.68rem;color:#7c3aed;background:#f5f3ff;'
+                    f'padding:.1rem .4rem;border-radius:20px;font-weight:600">v{len(_versions)+1}</span>'
+                    if _versions else ""
+                )
+            else:
+                _versions, _ver_badge = [], ""
+
             del_col, card_col = st.columns([0.08, 0.92])
             with card_col:
                 st.markdown(
                     f"""<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;
-                                  padding:.75rem 1rem;margin-bottom:.4rem;
+                                  padding:.75rem 1rem;margin-bottom:.2rem;
                                   border-left:4px solid {fg};display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
                       <span style="font-size:1.3rem">{ficon}</span>
                       <div style="flex:1;min-width:0">
                         <div style="font-weight:600;color:#1a2744;font-size:.88rem;
-                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{name}</div>
+                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{name}
+                          {_ver_badge}
+                        </div>
                         <div style="font-size:.75rem;color:#64748b;margin-top:.15rem">
                           {matter_label}{(" · " + size_str) if size_str else ""}
                         </div>
@@ -130,12 +145,75 @@ with tab_all:
                     </div>""",
                     unsafe_allow_html=True,
                 )
+
+                if _vers_avail and is_firm_user():
+                    with st.expander(f"📚 Version History ({len(_versions)+1} total)", expanded=False):
+                        # Current version
+                        st.markdown(
+                            f'<div style="background:#f0fdf4;border-radius:6px;padding:.4rem .7rem;'
+                            f'margin-bottom:.25rem;font-size:.8rem;border-left:3px solid #16a34a">'
+                            f'<b>v{len(_versions)+1}</b> — <em>Current</em> · {ts}'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+                        for _v in _versions:
+                            _vts = str(_v.get("created_at",""))[:10]
+                            st.markdown(
+                                f'<div style="background:#f8fafc;border-radius:6px;padding:.4rem .7rem;'
+                                f'margin-bottom:.25rem;font-size:.8rem;border-left:3px solid #94a3b8">'
+                                f'<b>v{_v["version_number"]}</b> — {_v.get("name","") or "Version"}'
+                                f'{(" · " + _v["notes"]) if _v.get("notes") else ""} · <span style="color:#9ca3af">{_vts}</span>'
+                                f'</div>',
+                                unsafe_allow_html=True,
+                            )
+                        st.markdown("**Upload new version:**")
+                        _nv_name  = st.text_input("Version name/label", key=f"nv_name_{doc['id']}",
+                                                   placeholder="e.g. Draft v2 with client changes")
+                        _nv_notes = st.text_input("Notes", key=f"nv_notes_{doc['id']}",
+                                                   placeholder="What changed?")
+                        _nv_file  = st.file_uploader("Attach file (optional)", key=f"nv_file_{doc['id']}")
+                        if st.button("⬆️ Save New Version", key=f"nv_save_{doc['id']}", type="primary"):
+                            _next_ver = len(_versions) + 1
+                            db.add_document_version(
+                                doc_id=doc["id"],
+                                version_number=_next_ver,
+                                name=_nv_name.strip() or f"Version {_next_ver}",
+                                notes=_nv_notes.strip(),
+                                file_type=_nv_file.type if _nv_file else ftype,
+                                file_size=_nv_file.size if _nv_file else None,
+                            )
+                            # Update main doc record with new name if provided
+                            if _nv_name.strip():
+                                db.update_document_visibility(doc["id"], vis)
+                            st.success(f"✅ Version {_next_ver} saved.")
+                            st.rerun()
+
             with del_col:
                 if is_firm_user():
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("🗑️", key=f"dl_del_{doc['id']}", help="Delete document"):
                         db.delete_document(doc["id"])
                         st.rerun()
+
+        # Version control setup prompt
+        if is_firm_user() and not _vers_avail:
+            with st.expander("💡 Enable Document Version Control"):
+                st.info("Run this SQL in your Supabase SQL Editor to enable version history:")
+                st.code(
+                    "CREATE TABLE document_versions (\n"
+                    "  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),\n"
+                    "  organization_id text NOT NULL,\n"
+                    "  document_id uuid REFERENCES documents(id) ON DELETE CASCADE,\n"
+                    "  version_number integer NOT NULL,\n"
+                    "  name text,\n"
+                    "  notes text,\n"
+                    "  file_type text,\n"
+                    "  file_size bigint,\n"
+                    "  uploaded_by uuid,\n"
+                    "  created_at timestamptz DEFAULT now()\n"
+                    ");",
+                    language="sql",
+                )
 
         # Bulk visibility change (firm users only)
         if is_firm_user():
