@@ -320,15 +320,33 @@ with col_form:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Check Supabase is reachable before showing the form ──
+    import os as _os
+    _supa_url = _os.environ.get("SUPABASE_URL", "") or ""
+    if not _supa_url:
+        try:
+            _supa_url = st.secrets.get("SUPABASE_URL", "") or ""
+        except Exception:
+            _supa_url = ""
+
+    if not _supa_url:
+        st.error(
+            "⚙️ **Database not configured.** "
+            "SUPABASE_URL is missing from Railway environment variables. "
+            "Go to Railway → your project → Variables and add SUPABASE_URL, "
+            "SUPABASE_ANON_KEY, and SUPABASE_SERVICE_KEY."
+        )
+        st.stop()
+
+    # ── Persistent login message shown above the form ──
+    _top_msg = st.session_state.pop("_li_msg", None)
+    if _top_msg:
+        kind, text = _top_msg
+        getattr(st, kind)(text)
+
     tab_login, tab_register = st.tabs(["Sign In", "Register New Firm"])
 
     with tab_login:
-        # Persistent message — shown on the rerun AFTER the button is clicked
-        _msg = st.session_state.pop("_li_msg", None)
-        if _msg:
-            kind, text = _msg
-            getattr(st, kind)(text)
-
         email    = st.text_input("Email address", placeholder="you@yourfirm.com", key="li_email")
         password = st.text_input("Password", type="password", key="li_pw")
 
@@ -348,7 +366,7 @@ with col_form:
         st.caption("Forgot your password? Ask your firm administrator to reset it.")
 
     with tab_register:
-        _reg_msg = st.session_state.pop("_reg_msg", None)
+        _reg_msg = st.session_state.pop("_reg_msg", None)  # noqa: F841 (consumed below)
         if _reg_msg:
             kind, text = _reg_msg
             getattr(st, kind)(text)
