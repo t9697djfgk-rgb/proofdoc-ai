@@ -513,6 +513,121 @@ def delete_law(law_id: str) -> None:
         pass
 
 
+# ── Document Templates ────────────────────────────────────────────
+
+_TPL_TABLE = "document_templates"
+
+def templates_available() -> bool:
+    try:
+        get_db().table(_TPL_TABLE).select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+def save_template(name: str, category: str, jurisdiction: str,
+                  body: str, notes: str = "") -> bool:
+    org = _org()
+    if not org:
+        return False
+    try:
+        get_db().table(_TPL_TABLE).insert({
+            "organization_id": org, "name": name,
+            "category": category, "jurisdiction": jurisdiction,
+            "body": body, "notes": notes, "created_by": _uid(),
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+def list_templates(category: str | None = None, search: str | None = None) -> list[dict]:
+    org = _org()
+    if not org:
+        return []
+    try:
+        q = (get_db().table(_TPL_TABLE)
+             .select("id,name,category,jurisdiction,notes,created_at")
+             .eq("organization_id", org))
+        if category:
+            q = q.eq("category", category)
+        if search:
+            q = q.ilike("name", f"%{search}%")
+        return (q.order("name").execute()).data or []
+    except Exception:
+        return []
+
+def get_template_body(tpl_id: str) -> str:
+    try:
+        resp = (get_db().table(_TPL_TABLE)
+                .select("body").eq("id", tpl_id).maybe_single().execute())
+        return (resp.data or {}).get("body", "")
+    except Exception:
+        return ""
+
+def delete_template(tpl_id: str) -> None:
+    try:
+        get_db().table(_TPL_TABLE).delete().eq("id", tpl_id).execute()
+    except Exception:
+        pass
+
+
+# ── Clause Library (DB-backed) ─────────────────────────────────────
+
+_CL_TABLE = "clause_library_db"
+
+def clauses_db_available() -> bool:
+    try:
+        get_db().table(_CL_TABLE).select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+def save_clause(title: str, category: str, jurisdiction: str,
+                clause_text: str, notes: str = "", risk_level: str = "medium") -> bool:
+    org = _org()
+    if not org:
+        return False
+    try:
+        get_db().table(_CL_TABLE).insert({
+            "organization_id": org, "title": title,
+            "category": category, "jurisdiction": jurisdiction,
+            "clause_text": clause_text, "notes": notes,
+            "risk_level": risk_level, "approved": False,
+            "created_by": _uid(),
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+def list_clauses(search: str | None = None, category: str | None = None,
+                 jurisdiction: str | None = None) -> list[dict]:
+    org = _org()
+    if not org:
+        return []
+    try:
+        q = get_db().table(_CL_TABLE).select("*").eq("organization_id", org)
+        if category:
+            q = q.eq("category", category)
+        if jurisdiction:
+            q = q.eq("jurisdiction", jurisdiction)
+        if search:
+            q = q.ilike("title", f"%{search}%")
+        return (q.order("title").execute()).data or []
+    except Exception:
+        return []
+
+def update_clause_db(clause_id: str, **kwargs) -> None:
+    try:
+        get_db().table(_CL_TABLE).update(kwargs).eq("id", clause_id).execute()
+    except Exception:
+        pass
+
+def delete_clause_db(clause_id: str) -> None:
+    try:
+        get_db().table(_CL_TABLE).delete().eq("id", clause_id).execute()
+    except Exception:
+        pass
+
+
 # ── Dashboard stats ────────────────────────────────────────────────
 
 def dashboard_stats() -> dict:

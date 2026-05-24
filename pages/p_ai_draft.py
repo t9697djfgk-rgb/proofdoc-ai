@@ -170,47 +170,86 @@ with tab2:
 
 # ── 3. Clause Library ─────────────────────────────────────────────
 with tab3:
-    from utils.clause_library import (
-        CATEGORIES, JURISDICTIONS, get_all, search, add_clause, update_clause, delete_clause,
-    )
-    cl_search, cl_add = st.tabs(["🔍 Browse & Search", "➕ Add Clause"])
+    import utils.database as _dbcl
+    from utils.clause_library import CATEGORIES, JURISDICTIONS
 
-    with cl_search:
+    _CLAUSE_SETUP_SQL = """
+CREATE TABLE IF NOT EXISTS clause_library_db (
+    id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID,
+    title           TEXT NOT NULL,
+    category        TEXT DEFAULT '',
+    jurisdiction    TEXT DEFAULT '',
+    clause_text     TEXT DEFAULT '',
+    notes           TEXT DEFAULT '',
+    risk_level      TEXT DEFAULT 'medium',
+    approved        BOOLEAN DEFAULT FALSE,
+    created_by      UUID,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_clause_lib_org ON clause_library_db(organization_id);
+"""
+    _cl_db_ok = _dbcl.clauses_db_available()
+
+    if not _cl_db_ok:
+        st.info("💡 Run this SQL in Supabase to enable persistent clause storage:")
+        st.code(_CLAUSE_SETUP_SQL, language="sql")
+
+    cl_browse, cl_add, cl_ai = st.tabs(["🔍 Browse & Search", "➕ Add Clause", "🤖 AI Extract"])
+
+    with cl_browse:
         sc1, sc2, sc3 = st.columns(3)
-        search_q = sc1.text_input("Search clauses", placeholder="e.g. force majeure, termination", key="cl_sq")
+        search_q = sc1.text_input("Search clauses", placeholder="e.g. force majeure", key="cl_sq")
         cat_filter = sc2.selectbox("Category", ["All"] + CATEGORIES, key="cl_cf")
         jur_filter = sc3.selectbox("Jurisdiction", ["All"] + JURISDICTIONS, key="cl_jf")
         cat_arg = None if cat_filter == "All" else cat_filter
         jur_arg = None if jur_filter == "All" else jur_filter
-        if search_q:
-            clauses = search(search_q, cat_arg or "", jur_arg or "")
+
+        if _cl_db_ok:
+            clauses = _dbcl.list_clauses(
+                search=search_q or None, category=cat_arg, jurisdiction=jur_arg
+            )
         else:
-            clauses = [
-                c for c in get_all()
-                if (not cat_arg or c.get("category") == cat_arg)
-                and (not jur_arg or c.get("jurisdiction") == jur_arg)
-            ]
+            from utils.clause_library import get_all, search as _cl_search
+            clauses = _cl_search(search_q, cat_arg or "", jur_arg or "") if search_q \
+                      else [c for c in get_all()
+                            if (not cat_arg or c.get("category") == cat_arg)
+                            and (not jur_arg or c.get("jurisdiction") == jur_arg)]
+
         st.caption(f"{len(clauses)} clause(s) found")
         for cl in clauses:
-            with st.expander(f"**{cl.get('title',cl.get('name',''))}** · {cl.get('category','')} · {cl.get('jurisdiction','')}"):
-                st.markdown(f'<div class="revised-doc">{cl.get("clause_text", cl.get("text",""))}</div>', unsafe_allow_html=True)
-                if cl.get("notes"): st.caption(f"📝 Notes: {cl['notes']}")
+            with st.expander(f"**{cl.get('title','')}** · {cl.get('category','')} · {cl.get('jurisdiction','')}"):
+                st.markdown(f'<div class="revised-doc">{cl.get("clause_text","")}</div>', unsafe_allow_html=True)
+                if cl.get("notes"): st.caption(f"📝 {cl['notes']}")
                 approved = cl.get("approved", False)
                 st.markdown(
-                    f'<span class="badge-available">✅ Approved</span>' if approved
+                    '<span class="badge-available">✅ Approved</span>' if approved
                     else '<span class="badge-soon">◌ Not reviewed</span>',
                     unsafe_allow_html=True,
                 )
-                c1x, c2x = st.columns(2)
-                note_edit = c1x.text_input("Update notes", value=cl.get("notes",""), key=f"note_{cl['id']}")
-                if c1x.button("💾 Save Note", key=f"save_{cl['id']}"):
-                    update_clause(cl["id"], notes=note_edit, approved=approved)
+                cx1, cx2, cx3 = st.columns(3)
+                note_edit = cx1.text_input("Notes", value=cl.get("notes",""), key=f"note_{cl['id']}")
+                if cx1.button("💾 Save", key=f"save_{cl['id']}"):
+                    if _cl_db_ok:
+                        _dbcl.update_clause_db(cl["id"], notes=note_edit, approved=approved)
+                    else:
+                        from utils.clause_library import update_clause as _ucl
+                        _ucl(cl["id"], notes=note_edit, approved=approved)
                     st.rerun()
-                if c2x.button("🔄 Toggle Approved", key=f"appr_{cl['id']}"):
-                    update_clause(cl["id"], notes=cl.get("notes",""), approved=not approved)
+                if cx2.button("🔄 Toggle Approved", key=f"appr_{cl['id']}"):
+                    if _cl_db_ok:
+                        _dbcl.update_clause_db(cl["id"], approved=not approved)
+                    else:
+                        from utils.clause_library import update_clause as _ucl
+                        _ucl(cl["id"], notes=cl.get("notes",""), approved=not approved)
                     st.rerun()
-                if c2x.button("🗑️ Delete", key=f"del_{cl['id']}"):
-                    delete_clause(cl["id"]); st.rerun()
+                if cx3.button("🗑️ Delete", key=f"del_{cl['id']}"):
+                    if _cl_db_ok:
+                        _dbcl.delete_clause_db(cl["id"])
+                    else:
+                        from utils.clause_library import delete_clause as _dcl
+                        _dcl(cl["id"])
+                    st.rerun()
 
     with cl_add:
         na = st.text_input("Clause Name *", key="cl_an")
@@ -220,10 +259,60 @@ with tab3:
         no = st.text_area("Notes", height=60, key="cl_ano")
         if st.button("➕ Add Clause", type="primary", key="cl_abtn"):
             if na.strip() and ta.strip():
-                add_clause(title=na, category=ca, jurisdiction=ja, clause_text=ta, notes=no)
+                if _cl_db_ok:
+                    _dbcl.save_clause(title=na, category=ca, jurisdiction=ja, clause_text=ta, notes=no)
+                else:
+                    from utils.clause_library import add_clause as _acl
+                    _acl(title=na, category=ca, jurisdiction=ja, clause_text=ta, notes=no)
                 st.success("✅ Clause added!")
+                st.rerun()
             else:
                 st.warning("⚠️ Name and text are required.")
+
+    with cl_ai:
+        st.markdown("Paste a contract or document — AI will extract all distinct clauses and save them to your library.")
+        if not _cl_db_ok:
+            st.warning("⚠️ Set up the Supabase table above first to save extracted clauses.")
+        cl_doc = st.text_area("Document to extract from *", height=200,
+                               placeholder="Paste any contract, agreement, or legal document…", key="cl_ai_doc")
+        cl_ai_jur = st.selectbox("Jurisdiction", JURISDICTIONS, key="cl_ai_jur")
+        if st.button("🤖 Extract Clauses with AI", type="primary",
+                     disabled=not api_key or not _cl_db_ok, key="cl_ai_btn"):
+            if not cl_doc.strip():
+                st.warning("⚠️ Paste a document first.")
+            else:
+                import anthropic, json, re
+                with st.spinner("Extracting clauses with Claude Opus 4.7…"):
+                    try:
+                        _cl_client = anthropic.Anthropic(api_key=api_key)
+                        _cl_resp = _cl_client.messages.create(
+                            model="claude-opus-4-7",
+                            max_tokens=4096,
+                            messages=[{"role": "user", "content":
+                                f"Extract all distinct legal clauses from the document below. "
+                                f"For each clause return a JSON object with: title, category (one of: "
+                                f"{', '.join(CATEGORIES)}), clause_text (verbatim), notes (1-sentence purpose). "
+                                f"Return a JSON array only.\n\nDocument:\n{cl_doc[:20_000]}"}],
+                        )
+                        raw = next((b.text for b in _cl_resp.content if b.type == "text"), "[]")
+                        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+                        raw = re.sub(r"\s*```$", "", raw.strip())
+                        extracted = json.loads(raw)
+                        saved = 0
+                        for ec in extracted:
+                            if ec.get("title") and ec.get("clause_text"):
+                                _dbcl.save_clause(
+                                    title=ec["title"],
+                                    category=ec.get("category", "Other"),
+                                    jurisdiction=cl_ai_jur,
+                                    clause_text=ec["clause_text"],
+                                    notes=ec.get("notes", ""),
+                                )
+                                saved += 1
+                        st.success(f"✅ {saved} clause(s) extracted and saved to your library!")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Extraction failed: {exc}")
 
 # ── 4. Compliance Policy Generator ───────────────────────────────
 with tab4:
@@ -362,11 +451,29 @@ with tab5:
 # ── 6. Template Builder ───────────────────────────────────────────
 with tab6:
     from utils.shared.styles import group_header as _gh
+    import utils.database as _dbtpl
     _gh("Template Builder")
-    st.markdown("Build a reusable document template by filling in the fields below. The template is saved to your session.")
 
-    if "templates" not in st.session_state:
-        st.session_state.templates = []
+    _TPL_SETUP_SQL = """
+CREATE TABLE IF NOT EXISTS document_templates (
+    id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID,
+    name            TEXT NOT NULL,
+    category        TEXT DEFAULT '',
+    jurisdiction    TEXT DEFAULT '',
+    body            TEXT DEFAULT '',
+    notes           TEXT DEFAULT '',
+    created_by      UUID,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_doc_tpl_org ON document_templates(organization_id);
+"""
+    _tpl_db_ok = _dbtpl.templates_available()
+    if not _tpl_db_ok:
+        st.info("💡 Run this SQL in Supabase to persist templates across sessions:")
+        st.code(_TPL_SETUP_SQL, language="sql")
+    else:
+        st.markdown("Templates are saved permanently to your firm's library.")
 
     _GALLERY = [
         {
@@ -558,40 +665,58 @@ Full Name: {{WITNESS_NAME}}""",
             tm_notes = st.text_area("Usage Notes", height=60)
             if st.form_submit_button("💾 Save Template"):
                 if tm_name.strip() and tm_body.strip():
-                    st.session_state.templates.append({
-                        "name": tm_name, "category": tm_cat, "jurisdiction": tm_jur,
-                        "body": tm_body, "notes": tm_notes,
-                    })
-                    st.success(f"✅ Template '{tm_name}' saved to session.")
+                    if _tpl_db_ok:
+                        _dbtpl.save_template(tm_name, tm_cat, tm_jur, tm_body, tm_notes)
+                    else:
+                        if "templates" not in st.session_state:
+                            st.session_state.templates = []
+                        st.session_state.templates.append({
+                            "id": f"s_{len(st.session_state.templates)}",
+                            "name": tm_name, "category": tm_cat, "jurisdiction": tm_jur,
+                            "body": tm_body, "notes": tm_notes,
+                        })
+                    st.success(f"✅ Template '{tm_name}' saved.")
                     st.rerun()
                 else:
                     st.warning("⚠️ Name and template text are required.")
 
     with t_tab_view:
-        templates = st.session_state.templates
-        if not templates:
-            st.markdown('<div class="empty-list">No templates yet. Create one in the tab above.</div>', unsafe_allow_html=True)
+        if _tpl_db_ok:
+            _tpl_search = st.text_input("Search templates", placeholder="Filter by name…", key="tpl_search")
+            templates = _dbtpl.list_templates(search=_tpl_search or None)
         else:
+            templates = st.session_state.get("templates", [])
+
+        if not templates:
+            st.markdown('<div class="empty-list">No templates yet. Create one or use a gallery template above.</div>',
+                        unsafe_allow_html=True)
+        else:
+            import re as _re
+            st.caption(f"{len(templates)} template(s)")
             for i, tmpl in enumerate(templates):
-                with st.expander(f"**{tmpl['name']}** · {tmpl['category']} · {tmpl['jurisdiction']}"):
-                    st.text_area("Template", value=tmpl["body"], height=150, key=f"tmpl_view_{i}", disabled=True)
+                with st.expander(f"**{tmpl['name']}** · {tmpl.get('category','')} · {tmpl.get('jurisdiction','')}"):
+                    body = tmpl.get("body") or (_dbtpl.get_template_body(tmpl["id"]) if _tpl_db_ok else "")
+                    st.text_area("Template", value=body, height=150, key=f"tmpl_view_{i}", disabled=True)
                     if tmpl.get("notes"): st.caption(f"Notes: {tmpl['notes']}")
-                    # Fill form
-                    import re as _re
-                    placeholders = _re.findall(r"\{\{(\w+)\}\}", tmpl["body"])
+                    placeholders = _re.findall(r"\{\{(\w+)\}\}", body)
                     if placeholders:
                         st.markdown("**Fill in placeholders:**")
                         fill_vals = {}
-                        for ph in set(placeholders):
-                            fill_vals[ph] = st.text_input(ph.replace("_", " ").title(), key=f"fill_{i}_{ph}")
-                        if st.button("📄 Generate Document from Template", key=f"gen_{i}"):
-                            filled = tmpl["body"]
+                        for ph in sorted(set(placeholders)):
+                            fill_vals[ph] = st.text_input(ph.replace("_", " ").title(),
+                                                           key=f"fill_{i}_{ph}")
+                        if st.button("📄 Generate Document", key=f"gen_{i}", type="primary"):
+                            filled = body
                             for ph, val in fill_vals.items():
                                 if val.strip():
                                     filled = filled.replace(f"{{{{{ph}}}}}", val.strip())
                             st.text_area("Filled Document", value=filled, height=200, key=f"filled_{i}")
-                            st.download_button("📥 Download (.txt)", filled, f"{tmpl['name']}.txt",
-                                               "text/plain", key=f"dl_tmpl_{i}")
+                            st.download_button("📥 Download (.txt)", filled,
+                                               f"{tmpl['name']}.txt", "text/plain",
+                                               key=f"dl_tmpl_{i}")
                     if st.button("🗑️ Delete Template", key=f"del_tmpl_{i}"):
-                        st.session_state.templates.pop(i)
+                        if _tpl_db_ok:
+                            _dbtpl.delete_template(tmpl["id"])
+                        else:
+                            st.session_state.templates.pop(i)
                         st.rerun()

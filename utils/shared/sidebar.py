@@ -80,6 +80,78 @@ def render_sidebar(tool_name: str = "") -> str | None:
                 if tool_name:
                     st.divider()
 
+        # ── Quick Time Tracker ─────────────────────────────────────
+        if user and user.get("role") != "client":
+            import time as _time
+            st.markdown(
+                '<p style="font-size:0.75rem;font-weight:700;color:#1a2744;'
+                'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem">'
+                '⏱️ Time Tracker</p>',
+                unsafe_allow_html=True,
+            )
+            if "timer_running" not in st.session_state:
+                st.session_state.timer_running = False
+                st.session_state.timer_start   = 0.0
+                st.session_state.timer_matter  = None
+
+            if not st.session_state.timer_running:
+                try:
+                    from utils import database as _tdb
+                    _tm_list = _tdb.list_matters()
+                except Exception:
+                    _tm_list = []
+                _tm_opts = {"— No matter —": None}
+                _tm_opts.update({
+                    f"{m.get('ref','')} {(m.get('title') or '')[:22]}": m["id"]
+                    for m in _tm_list
+                })
+                _tm_sel = st.selectbox("Matter", list(_tm_opts.keys()),
+                                       key="sb_timer_matter", label_visibility="collapsed")
+                if st.button("▶ Start Timer", use_container_width=True, key="sb_timer_start"):
+                    st.session_state.timer_running = True
+                    st.session_state.timer_start   = _time.time()
+                    st.session_state.timer_matter  = _tm_opts[_tm_sel]
+                    st.rerun()
+            else:
+                _elapsed = _time.time() - st.session_state.timer_start
+                _th = int(_elapsed // 3600)
+                _tm2 = int((_elapsed % 3600) // 60)
+                _ts2 = int(_elapsed % 60)
+                st.markdown(
+                    f'<div style="font-size:1.4rem;font-weight:800;color:#1a2744;'
+                    f'letter-spacing:.05em;text-align:center;padding:.3rem 0">'
+                    f'⏱ {_th:02d}:{_tm2:02d}:{_ts2:02d}</div>',
+                    unsafe_allow_html=True,
+                )
+                _tdesc = st.text_input("What are you working on?", key="sb_timer_desc",
+                                       label_visibility="collapsed",
+                                       placeholder="e.g. Drafting NDA, client call…")
+                _trate = st.number_input("Rate (£/hr)", min_value=0.0, step=50.0,
+                                         value=250.0, key="sb_timer_rate",
+                                         label_visibility="collapsed")
+                _sc1, _sc2 = st.columns(2)
+                if _sc1.button("⏹ Log", type="primary",
+                               use_container_width=True, key="sb_timer_stop"):
+                    _hours = max(round(_elapsed / 3600 * 4) / 4, 0.25)
+                    try:
+                        from utils import database as _tdb
+                        _tdb.add_time_entry(
+                            st.session_state.timer_matter, _hours,
+                            _tdesc.strip() or "Timer session",
+                            _trate,
+                        )
+                        st.success(f"✅ {_hours:.2f}h logged!")
+                    except Exception:
+                        pass
+                    st.session_state.timer_running = False
+                    st.session_state.timer_start   = 0.0
+                    st.rerun()
+                if _sc2.button("✕ Discard", use_container_width=True, key="sb_timer_cancel"):
+                    st.session_state.timer_running = False
+                    st.session_state.timer_start   = 0.0
+                    st.rerun()
+            st.divider()
+
         # ── Rwanda Laws selector (AI tool pages only) ─────────────
         if tool_name and user and user.get("role") != "client":
             try:

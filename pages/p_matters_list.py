@@ -142,7 +142,7 @@ with tab_matters:
             m_tabs = st.tabs([
                 "Overview", "Tasks", "Notes", "Time", "Documents",
                 "Members", "Discussion", "AI Reviews", "Drafts",
-                "Deadlines", "Billing", "Audit",
+                "Deadlines", "Billing", "Audit", "🕐 Timeline",
             ])
 
             # Overview
@@ -455,6 +455,100 @@ with tab_matters:
                 else:
                     st.markdown('<div class="empty-list">📋 No audit entries recorded for this matter yet.</div>',
                                 unsafe_allow_html=True)
+
+            # m_tabs[12] – Timeline
+            with m_tabs[12]:
+                import datetime as _dt3
+                _events = []
+
+                # Tasks
+                for t in db.list_tasks(matter_id=matter["id"]):
+                    _events.append({
+                        "ts": str(t.get("created_at", ""))[:16],
+                        "icon": "📋", "color": "#2563eb",
+                        "title": f"Task created: {t.get('title','')}",
+                        "detail": f"Priority: {t.get('priority','—')} · Due: {str(t.get('due_date','—'))[:10]}",
+                    })
+                    if t.get("status") == "completed":
+                        _events.append({
+                            "ts": str(t.get("updated_at", t.get("created_at", "")))[:16],
+                            "icon": "✅", "color": "#16a34a",
+                            "title": f"Task completed: {t.get('title','')}",
+                            "detail": "",
+                        })
+
+                # Notes
+                for n in db.list_notes(matter["id"]):
+                    _author = (n.get("profiles") or {}).get("full_name", "Team")
+                    _events.append({
+                        "ts": str(n.get("created_at", ""))[:16],
+                        "icon": "📝", "color": "#7c3aed",
+                        "title": f"Note added{' — ' + n['title'] if n.get('title') else ''}",
+                        "detail": f"By {_author}",
+                    })
+
+                # Documents
+                for d in db.list_documents(matter_id=matter["id"]):
+                    _events.append({
+                        "ts": str(d.get("created_at", ""))[:16],
+                        "icon": "📄", "color": "#0891b2",
+                        "title": f"Document uploaded: {d.get('name','')}",
+                        "detail": d.get("visibility","").replace("_"," ").title(),
+                    })
+
+                # Time entries
+                for e in db.list_time_entries(matter["id"]):
+                    _events.append({
+                        "ts": str(e.get("entry_date", e.get("created_at", "")))[:16],
+                        "icon": "⏱", "color": "#c9a84c",
+                        "title": f"Time logged: {e['hours']:.2f}h — {e.get('description','—')}",
+                        "detail": f"£{(e.get('rate') or 0):.0f}/hr",
+                    })
+
+                # Matter creation/updates from audit log
+                _org3 = (st.session_state.get("user") or {}).get("organization_id")
+                try:
+                    _al3 = (db.get_db().table("audit_logs")
+                            .select("action,created_at,changes")
+                            .eq("organization_id", _org3)
+                            .eq("entity_id", matter["id"])
+                            .order("created_at", desc=True).limit(30).execute()).data or []
+                    for _e3 in _al3:
+                        _icon3 = {"MATTER_CREATED": "🏁", "MATTER_UPDATED": "✏️",
+                                  "MEMBER_ADDED": "👤"}.get(_e3.get("action",""), "📌")
+                        _events.append({
+                            "ts": str(_e3.get("created_at",""))[:16],
+                            "icon": _icon3, "color": "#1a2744",
+                            "title": _e3.get("action","").replace("_"," ").title(),
+                            "detail": "",
+                        })
+                except Exception:
+                    pass
+
+                # Sort newest first
+                _events.sort(key=lambda x: x["ts"], reverse=True)
+
+                if not _events:
+                    st.markdown('<div class="empty-list">🕐 No activity recorded yet.</div>',
+                                unsafe_allow_html=True)
+                else:
+                    st.caption(f"{len(_events)} events on this matter")
+                    for _ev in _events:
+                        _ts_display = _ev["ts"].replace("T", " ") if _ev["ts"] else "—"
+                        st.markdown(
+                            f"""<div style="display:flex;align-items:flex-start;gap:.75rem;
+                                          padding:.55rem 0;border-bottom:1px solid #f1f5f9">
+                              <div style="width:32px;height:32px;border-radius:50%;background:{_ev['color']}18;
+                                          display:flex;align-items:center;justify-content:center;
+                                          font-size:1rem;flex-shrink:0">{_ev['icon']}</div>
+                              <div style="flex:1;min-width:0">
+                                <div style="font-size:.85rem;font-weight:600;color:#1a2744">{_ev['title']}</div>
+                                {f'<div style="font-size:.75rem;color:#64748b">{_ev["detail"]}</div>' if _ev.get('detail') else ''}
+                              </div>
+                              <div style="font-size:.7rem;color:#94a3b8;white-space:nowrap;flex-shrink:0">{_ts_display}</div>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
 
         if st.button("← Back to list"):
             st.session_state.selected_matter_id = None

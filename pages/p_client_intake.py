@@ -89,6 +89,42 @@ if st.session_state.get("ci_result"):
         st.markdown(f"**Estimated Timeline:** {result.get('estimated_timeline', '—')}")
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Create matter directly from intake ────────────────────────
+    section("➕ Create Matter from this Intake")
+    ci1, ci2, ci3 = st.columns(3)
+    ci_title = ci1.text_input("Matter Title *",
+                               value=f"{client_name} — {matter_type}",
+                               key="ci_m_title")
+    ci_jur   = ci2.selectbox("Jurisdiction",
+                              ["Rwanda", "UK", "US", "EU", "International", "Other"],
+                              key="ci_m_jur")
+    ci_pri   = ci3.selectbox("Priority", ["high", "medium", "low"], index=1, key="ci_m_pri")
+    if st.button("➕ Create Matter in System", type="primary",
+                 use_container_width=True, key="ci_create_matter"):
+        if not ci_title.strip():
+            st.warning("⚠️ Matter title is required.")
+        else:
+            import utils.database as db
+            import datetime as _dt
+            existing = db.list_matters()
+            ref = f"MAT-{_dt.date.today().year}-{len(existing)+1:04d}"
+            m = db.create_matter(
+                ref=ref,
+                title=ci_title.strip(),
+                matter_type=result.get("matter_classification", matter_type),
+                jurisdiction=ci_jur,
+                description=handover[:1000] if handover else "",
+                opposing_party=opposing.strip() if opposing else None,
+                priority=ci_pri,
+            )
+            if m:
+                st.success(f"✅ Matter **{ref}** created! Go to Matters to open it.")
+                st.session_state.selected_matter_id = m["id"]
+            else:
+                st.error("Failed to create matter — make sure you are logged in.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
     action_row(
         text_to_download=handover,
         base_filename="client_intake",
