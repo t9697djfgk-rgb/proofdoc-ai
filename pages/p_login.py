@@ -338,44 +338,34 @@ with col_form:
         )
         st.stop()
 
-    # ── Persistent login message shown above the form ──
-    _top_msg = st.session_state.pop("_li_msg", None)
-    if _top_msg:
-        kind, text = _top_msg
-        getattr(st, kind)(text)
-
     tab_login, tab_register = st.tabs(["Sign In", "Register New Firm"])
 
     with tab_login:
+        login_msg = st.empty()
         email    = st.text_input("Email address", placeholder="you@yourfirm.com", key="li_email")
         password = st.text_input("Password", type="password", key="li_pw")
 
         if st.button("Sign In →", type="primary", use_container_width=True, key="li_btn"):
             if not email.strip() or not password:
-                st.session_state["_li_msg"] = ("warning", "Please enter your email and password.")
-                st.rerun()
+                login_msg.warning("Please enter your email and password.")
             else:
                 from utils.auth import sign_in
-                result = sign_in(email.strip(), password)
+                with st.spinner("Signing in…"):
+                    result = sign_in(email.strip(), password)
                 if result["ok"]:
                     st.rerun()
                 else:
-                    st.session_state["_li_msg"] = ("error", f"❌ {result['error']}")
-                    st.rerun()
+                    login_msg.error(f"❌ {result['error']}")
 
         st.caption("Forgot your password? Ask your firm administrator to reset it.")
 
     with tab_register:
-        _reg_msg = st.session_state.pop("_reg_msg", None)  # noqa: F841 (consumed below)
-        if _reg_msg:
-            kind, text = _reg_msg
-            getattr(st, kind)(text)
-
         st.markdown(
             "<p style='font-size:.83rem;color:#6b7280;margin:0 0 .8rem'>"
             "Create a new firm account — you will be the <strong style='color:#1a2744'>admin</strong>.</p>",
             unsafe_allow_html=True,
         )
+        reg_msg   = st.empty()
         firm_name = st.text_input("Law Firm Name", placeholder="e.g. Nkurunziza & Associates", key="reg_firm")
         full_name = st.text_input("Your Full Name", placeholder="e.g. Marie Uwimana", key="reg_name")
         reg_email = st.text_input("Email", placeholder="admin@yourfirm.com", key="reg_email")
@@ -393,17 +383,16 @@ with col_form:
             if len(reg_pw) < 8:       errors.append("Password must be at least 8 characters.")
             if reg_pw != reg_pw2:     errors.append("Passwords do not match.")
             if errors:
-                st.session_state["_reg_msg"] = ("warning", " · ".join(errors))
-                st.rerun()
+                reg_msg.warning(" · ".join(errors))
             else:
                 from utils.auth import register_firm
-                result = register_firm(firm_name.strip(), reg_email.strip(),
-                                       reg_pw, full_name.strip())
+                with st.spinner("Creating account…"):
+                    result = register_firm(firm_name.strip(), reg_email.strip(),
+                                           reg_pw, full_name.strip())
                 if result["ok"]:
                     st.rerun()
                 else:
-                    st.session_state["_reg_msg"] = ("error", f"❌ {result['error']}")
-                    st.rerun()
+                    reg_msg.error(f"❌ {result['error']}")
 
     st.markdown(
         "<div class='f-foot'>&#9878; eLawFirm &nbsp;&middot;&nbsp; AI output does not replace qualified legal advice</div>",
