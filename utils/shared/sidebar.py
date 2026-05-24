@@ -80,6 +80,53 @@ def render_sidebar(tool_name: str = "") -> str | None:
                 if tool_name:
                     st.divider()
 
+        # ── Rwanda Laws selector (AI tool pages only) ─────────────
+        if tool_name and user and user.get("role") != "client":
+            try:
+                from utils import database as db
+                st.markdown(
+                    '<p style="font-size:0.75rem;font-weight:700;color:#1a2744;'
+                    'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem">'
+                    '⚖️ Rwanda Laws</p>',
+                    unsafe_allow_html=True,
+                )
+                if "sidebar_selected_laws" not in st.session_state:
+                    st.session_state.sidebar_selected_laws = {}
+
+                _law_search = st.text_input(
+                    "Search Rwanda laws",
+                    placeholder="e.g. labour, land, company…",
+                    key="sb_law_search",
+                    label_visibility="collapsed",
+                )
+                _law_list = db.list_laws(search=_law_search if _law_search else None)
+                if _law_list:
+                    for _lw in _law_list[:8]:
+                        _checked = _lw["id"] in st.session_state.sidebar_selected_laws
+                        if st.checkbox(
+                            f"{_lw['title'][:36]}{'…' if len(_lw['title']) > 36 else ''}",
+                            value=_checked,
+                            key=f"sb_law_{_lw['id']}",
+                        ):
+                            st.session_state.sidebar_selected_laws[_lw["id"]] = _lw["title"]
+                        else:
+                            st.session_state.sidebar_selected_laws.pop(_lw["id"], None)
+                    if st.session_state.sidebar_selected_laws:
+                        n = len(st.session_state.sidebar_selected_laws)
+                        st.markdown(
+                            f'<span style="background:#f0fdf4;color:#166534;font-size:0.73rem;'
+                            f'font-weight:600;padding:0.15rem 0.55rem;border-radius:20px">'
+                            f'⚖️ {n} law{"s" if n > 1 else ""} selected</span>',
+                            unsafe_allow_html=True,
+                        )
+                elif _law_search:
+                    st.caption("No matching laws.")
+                else:
+                    st.caption("Upload laws in ⚖️ Law Library first.")
+                st.divider()
+            except Exception:
+                pass
+
         # ── Privacy notice ─────────────────────────────────────────
         st.markdown("**🔐 Privacy**")
         st.markdown("- Processed in memory only")
@@ -89,6 +136,30 @@ def render_sidebar(tool_name: str = "") -> str | None:
         st.caption("⚠️ AI output does not replace qualified legal advice.")
 
     return api_key
+
+
+def get_law_context_block() -> str:
+    """Return formatted Rwanda law text for all sidebar-selected laws."""
+    selected = st.session_state.get("sidebar_selected_laws", {})
+    if not selected:
+        return ""
+    try:
+        from utils import database as db
+        parts = []
+        for law_id, law_title in selected.items():
+            try:
+                text = db.get_law_text(law_id)
+                if text:
+                    truncated = text[:50_000]
+                    note = "\n[truncated]" if len(text) > 50_000 else ""
+                    parts.append(
+                        f"── RWANDA LAW: {law_title} ──\n{truncated}{note}\n── END LAW ──"
+                    )
+            except Exception:
+                pass
+        return "\n\n".join(parts)
+    except Exception:
+        return ""
 
 
 def _render_search_results(query: str) -> None:

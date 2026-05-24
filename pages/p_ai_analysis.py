@@ -1,12 +1,24 @@
 import streamlit as st
-from utils.shared.sidebar import setup_page
+from utils.shared.sidebar import setup_page, get_law_context_block
 from utils.shared.styles import slim_header, disclaimer, section, risk_badge
 from utils.shared.document_input import document_input_ui, two_document_input_ui
 from utils.shared.export_utils import download_json
 
 from utils.auth import require_lawyer
-api_key = setup_page()
+api_key = setup_page("Analysis")
 require_lawyer()
+
+
+def _with_laws(text: str) -> str:
+    ctx = get_law_context_block()
+    if ctx:
+        return (
+            "[APPLICABLE RWANDA LAWS — use as legal context for your analysis]\n"
+            + ctx
+            + "\n[END LAWS — document to analyse follows]\n\n"
+            + text
+        )
+    return text
 slim_header("📊", "Analysis", "Contract summaries, due diligence, risk reports, and document comparison")
 disclaimer()
 
@@ -39,7 +51,7 @@ with tab1:
             from utils.due_diligence import DueDiligenceReview
             with st.spinner("Reviewing with Claude Opus 4.7…"):
                 try:
-                    result1 = DueDiligenceReview(api_key).review(text1, matter_type, client_perspective, key_concerns)
+                    result1 = DueDiligenceReview(api_key).review(_with_laws(text1), matter_type, client_perspective, key_concerns)
                     st.session_state.dda_result = result1
                     st.success("✅ Review complete!")
                 except Exception as exc:
@@ -161,7 +173,7 @@ with tab3:
             from utils.contract_summary import ContractSummarizer
             with st.spinner("Summarising with Claude Opus 4.7…"):
                 try:
-                    result3 = ContractSummarizer(api_key).summarize(text3, cs_type, cs_persp)
+                    result3 = ContractSummarizer(api_key).summarize(_with_laws(text3), cs_type, cs_persp)
                     st.session_state.cs_result = result3
                     st.success("✅ Summary complete!")
                 except Exception as exc:
@@ -222,7 +234,7 @@ with tab4:
             from utils.contract_summary import RiskReportGenerator
             with st.spinner("Generating with Claude Opus 4.7…"):
                 try:
-                    result4 = RiskReportGenerator(api_key).generate(text4, rr_type, rr_audience, rr_jur)
+                    result4 = RiskReportGenerator(api_key).generate(_with_laws(text4), rr_type, rr_audience, rr_jur)
                     st.session_state.rr_result = result4
                     st.success("✅ Risk report ready!")
                 except Exception as exc:

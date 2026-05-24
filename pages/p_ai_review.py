@@ -1,12 +1,24 @@
 import streamlit as st
-from utils.shared.sidebar import setup_page
+from utils.shared.sidebar import setup_page, get_law_context_block
 from utils.shared.styles import slim_header, disclaimer, section, risk_badge
 from utils.shared.document_input import document_input_ui
 from utils.shared.export_utils import action_row, download_json, download_txt
 
 from utils.auth import require_lawyer
-api_key = setup_page()
+api_key = setup_page("Review")
 require_lawyer()
+
+
+def _with_laws(text: str) -> str:
+    ctx = get_law_context_block()
+    if ctx:
+        return (
+            "[APPLICABLE RWANDA LAWS — use as legal context for your review]\n"
+            + ctx
+            + "\n[END LAWS — document to review follows]\n\n"
+            + text
+        )
+    return text
 slim_header("🔍", "Review", "AI-powered legal document review — grammar, risk, citations, and deadlines")
 disclaimer()
 
@@ -39,7 +51,7 @@ with tab1:
             from utils.legal_reviewer import LegalReviewer
             with st.spinner("Reviewing with Claude Opus 4.7…"):
                 try:
-                    result = LegalReviewer(api_key).review(text, review_type, legal_style)
+                    result = LegalReviewer(api_key).review(_with_laws(text), review_type, legal_style)
                     st.session_state.ler_result = result
                     st.success("✅ Review complete!")
                 except Exception as exc:
@@ -121,7 +133,7 @@ with tab2:
             from utils.contract_risk import ContractRiskChecker
             with st.spinner("Analysing with Claude Opus 4.7…"):
                 try:
-                    result2 = ContractRiskChecker(api_key).check(text2, contract_type, client_pos, jurisdiction)
+                    result2 = ContractRiskChecker(api_key).check(_with_laws(text2), contract_type, client_pos, jurisdiction)
                     st.session_state.crc_result = result2
                     st.success("✅ Risk check complete!")
                 except Exception as exc:
@@ -192,7 +204,7 @@ with tab3:
             from utils.citation_checker import CitationChecker
             with st.spinner("Checking with Claude Opus 4.7…"):
                 try:
-                    result3 = CitationChecker(api_key).check(text3, cite_style, jur3)
+                    result3 = CitationChecker(api_key).check(_with_laws(text3), cite_style, jur3)
                     st.session_state.cc_result = result3
                     st.success("✅ Citation check complete!")
                 except Exception as exc:
@@ -240,7 +252,7 @@ with tab4:
             from utils.deadline_extractor import DeadlineExtractor
             with st.spinner("Extracting with Claude Opus 4.7…"):
                 try:
-                    result4 = DeadlineExtractor(api_key).extract(text4, doc_type4, party4)
+                    result4 = DeadlineExtractor(api_key).extract(_with_laws(text4), doc_type4, party4)
                     st.session_state.de_result = result4
                     st.success("✅ Extraction complete!")
                 except Exception as exc:
@@ -323,7 +335,7 @@ with tab5:
             from utils.issue_spotter import IssueSpotter
             with st.spinner("Analysing with Claude Opus 4.7…"):
                 try:
-                    result5 = IssueSpotter(api_key).spot(text5, is_doc_type, is_jur, is_persp)
+                    result5 = IssueSpotter(api_key).spot(_with_laws(text5), is_doc_type, is_jur, is_persp)
                     st.session_state.is_result = result5
                     st.success("✅ Analysis complete!")
                 except Exception as exc:
