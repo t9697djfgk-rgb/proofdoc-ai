@@ -13,9 +13,12 @@ def _secret(key: str) -> str:
         return ""
 
 
-@st.cache_resource
 def _service_client() -> Client:
-    return create_client(_secret("SUPABASE_URL"), _secret("SUPABASE_SERVICE_KEY"))
+    url = _secret("SUPABASE_URL")
+    key = _secret("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL or SUPABASE_SERVICE_KEY not set in environment.")
+    return create_client(url, key)
 
 
 def get_supabase() -> Client:
@@ -26,8 +29,12 @@ def get_supabase() -> Client:
 
 def sign_in(email: str, password: str) -> dict:
     try:
-        anon = create_client(_secret("SUPABASE_URL"), _secret("SUPABASE_ANON_KEY"))
-        resp = anon.auth.sign_in_with_password({"email": email, "password": password})
+        url  = _secret("SUPABASE_URL")
+        anon = _secret("SUPABASE_ANON_KEY")
+        if not url or not anon:
+            return {"ok": False, "error": f"Server config missing — SUPABASE_URL={'✓' if url else '✗'}, SUPABASE_ANON_KEY={'✓' if anon else '✗'}. Add them in Railway → Variables."}
+        client = create_client(url, anon)
+        resp = client.auth.sign_in_with_password({"email": email, "password": password})
         if not resp.user:
             return {"ok": False, "error": "Invalid email or password."}
         return _load_profile(resp.user.id)
@@ -35,7 +42,7 @@ def sign_in(email: str, password: str) -> dict:
         msg = str(e)
         if "Invalid login" in msg or "invalid_credentials" in msg:
             return {"ok": False, "error": "Invalid email or password."}
-        return {"ok": False, "error": msg}
+        return {"ok": False, "error": f"Auth error: {msg}"}
 
 
 def _load_profile(auth_user_id: str) -> dict:
