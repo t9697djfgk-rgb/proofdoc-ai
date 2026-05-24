@@ -126,46 +126,43 @@ html, body, [class*="css"] {
 /* ═══════════════════════════════════════════════════
    SIDEBAR TOGGLE BUTTON
 ═══════════════════════════════════════════════════ */
-@keyframes togglePulse {
-    0%,100% { box-shadow: 2px 0 12px rgba(26,39,68,0.25); }
-    50%      { box-shadow: 2px 0 20px rgba(201,168,76,0.35); }
-}
-@keyframes arrowBounce {
-    0%,100% { transform: translateX(0) translateY(-50%); }
-    50%      { transform: translateX(2px) translateY(-50%); }
-}
-
-/* The toggle tab that sticks out from the sidebar edge */
+/* ═══════════════════════════════════════════════════
+   SIDEBAR TOGGLE BUTTON — prominent hamburger
+═══════════════════════════════════════════════════ */
 [data-testid="collapsedControl"] {
+    position: fixed !important;
+    top: 0.9rem !important;
+    left: 0.9rem !important;
+    transform: none !important;
+    width: 44px !important;
+    height: 44px !important;
+    background: linear-gradient(135deg, #1a2744 0%, #253461 100%) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 16px rgba(26,39,68,0.35) !important;
+    cursor: pointer !important;
+    z-index: 9999 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 22px !important;
-    height: 56px !important;
-    background: linear-gradient(180deg, #1a2744 0%, #253461 100%) !important;
-    border-radius: 0 10px 10px 0 !important;
-    box-shadow: 2px 0 12px rgba(26,39,68,0.3) !important;
-    cursor: pointer !important;
-    position: fixed !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    z-index: 9999 !important;
-    transition: width 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
-    animation: togglePulse 3s ease-in-out infinite !important;
     border: none !important;
     outline: none !important;
+    transition: all 0.2s ease !important;
 }
 [data-testid="collapsedControl"]:hover {
-    width: 28px !important;
-    background: linear-gradient(180deg, #c9a84c 0%, #e8c97a 100%) !important;
-    box-shadow: 2px 0 20px rgba(201,168,76,0.4) !important;
-    animation: arrowBounce 0.6s ease-in-out infinite !important;
+    background: linear-gradient(135deg, #c9a84c 0%, #e8c97a 100%) !important;
+    box-shadow: 0 6px 22px rgba(201,168,76,0.45) !important;
+    transform: scale(1.08) !important;
+    width: 44px !important;
 }
 [data-testid="collapsedControl"] svg {
-    fill: #ffffff !important;
-    width: 12px !important;
-    height: 12px !important;
-    flex-shrink: 0 !important;
+    display: none !important;
+}
+[data-testid="collapsedControl"]::after {
+    content: "☰" !important;
+    color: #ffffff !important;
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+    display: block !important;
 }
 
 /* ═══════════════════════════════════════════════════
