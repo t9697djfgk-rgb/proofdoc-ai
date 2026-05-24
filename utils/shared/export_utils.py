@@ -62,11 +62,15 @@ def download_pdf(label: str, text: str, filename: str, title: str = "", key: str
     import io
     from fpdf import FPDF
 
+    def _s(s: str) -> str:
+        """Strip characters outside Latin-1; fpdf2 built-in fonts don't support Unicode/emoji."""
+        return s.encode("latin-1", errors="replace").decode("latin-1")
+
     class _PDF(FPDF):
         def header(self):
             if title:
                 self.set_font("Helvetica", "B", 13)
-                self.cell(0, 10, title, align="C", new_x="LMARGIN", new_y="NEXT")
+                self.cell(0, 10, _s(title), align="C", new_x="LMARGIN", new_y="NEXT")
                 self.ln(2)
 
     pdf = _PDF(orientation="P", unit="mm", format="A4")
@@ -74,12 +78,14 @@ def download_pdf(label: str, text: str, filename: str, title: str = "", key: str
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     pdf.set_font("Helvetica", size=10)
-    for line in text.split("\n"):
-        if line.strip().startswith("─") or line.strip().startswith("="):
+    for raw in text.split("\n"):
+        line = _s(raw)
+        stripped = line.strip()
+        if stripped.startswith("---") or stripped.startswith("==="):
             pdf.set_draw_color(200, 168, 76)
             pdf.line(20, pdf.get_y(), 190, pdf.get_y())
             pdf.ln(3)
-        elif line.strip() and line.strip() == line.strip().upper() and len(line.strip()) > 3:
+        elif stripped and stripped == stripped.upper() and len(stripped) > 3 and stripped.replace(" ", "").isalpha():
             pdf.set_font("Helvetica", "B", 10)
             pdf.multi_cell(0, 6, line)
             pdf.set_font("Helvetica", size=10)
