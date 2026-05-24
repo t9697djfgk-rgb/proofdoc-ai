@@ -79,6 +79,7 @@ col_hero, col_form = st.columns([1, 1], gap="small")
 
 # ── LEFT: Animated hero panel ─────────────────────────────────────────────────
 with col_hero:
+    # CSS must be in its own call — Streamlit drops HTML after </style> otherwise
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Inter:wght@300;400;500;600;700&display=swap');
@@ -237,7 +238,10 @@ with col_hero:
 /* Gold divider */
 .hw-line { width:36px;height:2.5px;background:linear-gradient(90deg,#c9a84c,transparent);border-radius:2px;margin:.5rem 0 1rem; }
 </style>
+""", unsafe_allow_html=True)
 
+    # HTML in a separate call so Streamlit doesn't swallow it after the <style> block
+    st.markdown("""
 <div class="hw">
   <!-- particles -->
   <div class="p1"></div><div class="p2"></div><div class="p3"></div>
@@ -354,6 +358,8 @@ with col_form:
     .f-sub  { font-size:.87rem;color:#6b7280;margin:0; }
     .f-foot { margin-top:2rem;font-size:.72rem;color:#9ca3af;text-align:center;padding-top:1rem;border-top:1px solid #e9e6df; }
     </style>
+    """, unsafe_allow_html=True)
+    st.markdown("""
     <div class="f-head">
       <div class="f-bar"></div>
       <h1 class="f-title">Welcome back</h1>
