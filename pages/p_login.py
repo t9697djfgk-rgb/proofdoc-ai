@@ -323,24 +323,36 @@ with col_form:
     tab_login, tab_register = st.tabs(["Sign In", "Register New Firm"])
 
     with tab_login:
+        # Persistent message — shown on the rerun AFTER the button is clicked
+        _msg = st.session_state.pop("_li_msg", None)
+        if _msg:
+            kind, text = _msg
+            getattr(st, kind)(text)
+
         email    = st.text_input("Email address", placeholder="you@yourfirm.com", key="li_email")
         password = st.text_input("Password", type="password", key="li_pw")
 
         if st.button("Sign In →", type="primary", use_container_width=True, key="li_btn"):
             if not email.strip() or not password:
-                st.warning("Please enter both email and password.")
+                st.session_state["_li_msg"] = ("warning", "Please enter your email and password.")
+                st.rerun()
             else:
-                with st.spinner("Signing in…"):
-                    from utils.auth import sign_in
-                    result = sign_in(email.strip(), password)
+                from utils.auth import sign_in
+                result = sign_in(email.strip(), password)
                 if result["ok"]:
                     st.rerun()
                 else:
-                    st.error(f"❌ {result['error']}")
+                    st.session_state["_li_msg"] = ("error", f"❌ {result['error']}")
+                    st.rerun()
 
         st.caption("Forgot your password? Ask your firm administrator to reset it.")
 
     with tab_register:
+        _reg_msg = st.session_state.pop("_reg_msg", None)
+        if _reg_msg:
+            kind, text = _reg_msg
+            getattr(st, kind)(text)
+
         st.markdown(
             "<p style='font-size:.83rem;color:#6b7280;margin:0 0 .8rem'>"
             "Create a new firm account — you will be the <strong style='color:#1a2744'>admin</strong>.</p>",
@@ -363,17 +375,17 @@ with col_form:
             if len(reg_pw) < 8:       errors.append("Password must be at least 8 characters.")
             if reg_pw != reg_pw2:     errors.append("Passwords do not match.")
             if errors:
-                for e in errors:
-                    st.warning(e)
+                st.session_state["_reg_msg"] = ("warning", " · ".join(errors))
+                st.rerun()
             else:
-                with st.spinner("Creating your firm account…"):
-                    from utils.auth import register_firm
-                    result = register_firm(firm_name.strip(), reg_email.strip(),
-                                          reg_pw, full_name.strip())
+                from utils.auth import register_firm
+                result = register_firm(firm_name.strip(), reg_email.strip(),
+                                       reg_pw, full_name.strip())
                 if result["ok"]:
                     st.rerun()
                 else:
-                    st.error(f"❌ {result['error']}")
+                    st.session_state["_reg_msg"] = ("error", f"❌ {result['error']}")
+                    st.rerun()
 
     st.markdown(
         "<div class='f-foot'>&#9878; eLawFirm &nbsp;&middot;&nbsp; AI output does not replace qualified legal advice</div>",
