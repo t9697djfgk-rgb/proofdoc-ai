@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import streamlit as st
+from docx.shared import Pt, RGBColor
 
 
 def download_txt(label: str, text: str, filename: str, key: str | None = None) -> None:
@@ -38,6 +39,33 @@ def download_md(label: str, text: str, filename: str, key: str | None = None) ->
     )
 
 
+_BODY_FONT = "Book Antiqua"
+_BODY_SIZE = Pt(12)
+
+
+def _style_run(run, bold: bool = False, size=None, color=None) -> None:
+    """Apply standard font styling to a run."""
+    from docx.shared import Pt, RGBColor
+    run.font.name = _BODY_FONT
+    run.font.size = size or _BODY_SIZE
+    run.font.bold = bold
+    if color:
+        run.font.color.rgb = color
+
+
+def _style_heading(p, level: int) -> None:
+    """Apply Book Antiqua bold styling to all runs in a heading paragraph."""
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    sizes = {1: Pt(14), 2: Pt(13), 3: Pt(12)}
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    for run in p.runs:
+        run.font.name = _BODY_FONT
+        run.font.size = sizes.get(level, Pt(12))
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+
+
 def _build_docx(text: str, title: str = "") -> bytes:
     """Convert text (plain or markdown) to a properly styled DOCX. Returns bytes."""
     import io
@@ -60,17 +88,13 @@ def _build_docx(text: str, title: str = "") -> bytes:
     hdr_para = doc.add_paragraph()
     hdr_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = hdr_para.add_run("eLawFirm")
-    run.font.size = Pt(16)
-    run.font.bold = True
-    run.font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+    _style_run(run, bold=True, size=Pt(16), color=RGBColor(0x1a, 0x27, 0x44))
 
     if title:
         tp = doc.add_paragraph()
         tp.alignment = WD_ALIGN_PARAGRAPH.CENTER
         tr = tp.add_run(title)
-        tr.font.size = Pt(13)
-        tr.font.bold = True
-        tr.font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+        _style_run(tr, bold=True, size=Pt(13), color=RGBColor(0x1a, 0x27, 0x44))
 
     # Horizontal rule after header
     hr_p = doc.add_paragraph()
@@ -101,17 +125,17 @@ def _build_docx(text: str, title: str = "") -> bytes:
         # Markdown headings
         if stripped.startswith("### "):
             p = doc.add_heading(stripped[4:], level=3)
-            p.runs[0].font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+            _style_heading(p, 3)
             i += 1
             continue
         if stripped.startswith("## "):
             p = doc.add_heading(stripped[3:], level=2)
-            p.runs[0].font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+            _style_heading(p, 2)
             i += 1
             continue
         if stripped.startswith("# "):
             p = doc.add_heading(stripped[2:], level=1)
-            p.runs[0].font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+            _style_heading(p, 1)
             i += 1
             continue
 
@@ -120,12 +144,12 @@ def _build_docx(text: str, title: str = "") -> bytes:
             next_stripped = lines[i + 1].strip()
             if next_stripped and all(c in "=" for c in next_stripped) and len(next_stripped) >= 3:
                 p = doc.add_heading(stripped, level=1)
-                p.runs[0].font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+                _style_heading(p, 1)
                 i += 2
                 continue
             if next_stripped and all(c in "-" for c in next_stripped) and len(next_stripped) >= 3:
                 p = doc.add_heading(stripped, level=2)
-                p.runs[0].font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+                _style_heading(p, 2)
                 i += 2
                 continue
 
@@ -135,7 +159,7 @@ def _build_docx(text: str, title: str = "") -> bytes:
             i += 1
             continue
 
-        # ALL-CAPS short section headers (e.g. "EXECUTIVE SUMMARY", "KEY FINDINGS:")
+        # ALL-CAPS short section headers
         is_section_header = (
             stripped == stripped.upper()
             and len(stripped) >= 4
@@ -145,7 +169,7 @@ def _build_docx(text: str, title: str = "") -> bytes:
         )
         if is_section_header:
             p = doc.add_heading(stripped.rstrip(":"), level=2)
-            p.runs[0].font.color.rgb = RGBColor(0x1a, 0x27, 0x44)
+            _style_heading(p, 2)
             i += 1
             continue
 
@@ -153,6 +177,7 @@ def _build_docx(text: str, title: str = "") -> bytes:
         if stripped.startswith("- ") or stripped.startswith("* "):
             content = stripped[2:]
             p = doc.add_paragraph(style="List Bullet")
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             _add_inline_formatted_run(p, content)
             i += 1
             continue
@@ -161,6 +186,7 @@ def _build_docx(text: str, title: str = "") -> bytes:
         if re.match(r"^\d+\.\s", stripped):
             content = re.sub(r"^\d+\.\s", "", stripped)
             p = doc.add_paragraph(style="List Number")
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             _add_inline_formatted_run(p, content)
             i += 1
             continue
@@ -168,14 +194,15 @@ def _build_docx(text: str, title: str = "") -> bytes:
         # Standalone bold line
         if stripped.startswith("**") and stripped.endswith("**") and len(stripped) > 4:
             p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             r2 = p.add_run(stripped[2:-2])
-            r2.font.bold = True
-            r2.font.size = Pt(11)
+            _style_run(r2, bold=True)
             i += 1
             continue
 
         # Normal paragraph with possible inline formatting
         p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         p.paragraph_format.space_after = Pt(4)
         _add_inline_formatted_run(p, stripped)
         i += 1
@@ -187,17 +214,18 @@ def _build_docx(text: str, title: str = "") -> bytes:
 
 def _add_inline_formatted_run(para, text: str) -> None:
     """Add text to a paragraph handling **bold** and _italic_ inline."""
-    # Split on **bold** and _italic_ patterns
     parts = re.split(r"(\*\*.*?\*\*|_.*?_)", text)
     for part in parts:
         if part.startswith("**") and part.endswith("**") and len(part) > 4:
             run = para.add_run(part[2:-2])
-            run.font.bold = True
+            _style_run(run, bold=True)
         elif part.startswith("_") and part.endswith("_") and len(part) > 2:
             run = para.add_run(part[1:-1])
+            _style_run(run)
             run.font.italic = True
         else:
-            para.add_run(part)
+            run = para.add_run(part)
+            _style_run(run)
 
 
 def dict_to_markdown(data: dict | list, title: str = "") -> str:
