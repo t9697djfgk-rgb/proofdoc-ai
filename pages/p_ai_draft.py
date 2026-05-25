@@ -72,10 +72,11 @@ with tab1:
         if not key_facts.strip():
             st.warning("⚠️ Key facts are required.")
         else:
+            import importlib, utils.drafting_assistant as _dam
+            importlib.reload(_dam)
             from utils.drafting_assistant import DraftingAssistant
             with st.spinner("Drafting with Claude Opus 4.7…"):
                 try:
-                    # Append selected Rwanda law text to additional instructions
                     _law_ctx = ""
                     for _lid, _ltitle in st.session_state.get("da_selected_laws", {}).items():
                         _ltxt = _db2.get_law_text(_lid)
@@ -89,21 +90,28 @@ with tab1:
                     st.success("✅ Draft generated!")
                 except Exception as exc:
                     st.error(f"Drafting failed: {exc}")
+                    import traceback
+                    st.code(traceback.format_exc())
     if st.session_state.get("da_result"):
+        import html as _html
         result = st.session_state.da_result
-        doc_text = result.get("document", "")
+        doc_text = result.get("draft_document", "")
         st.divider()
-        section(f"📄 {result.get('title', doc_type)}")
+        section(f"📄 {result.get('draft_title', doc_type)}")
         if doc_text:
-            st.markdown(f'<div class="revised-doc">{doc_text.replace(chr(10),"<br>")}</div>',
-                        unsafe_allow_html=True)
+            safe_html = _html.escape(doc_text).replace("\n", "<br>")
+            st.markdown(f'<div class="revised-doc">{safe_html}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Document body was empty.")
+            with st.expander("🔍 Full raw result"):
+                st.json(result)
         tabs_d = st.tabs(["💡 Assumptions Made", "❓ Missing Info", "⚠️ Risk Notes", "📌 Optional Clauses"])
         with tabs_d[0]:
             for a in result.get("assumptions", []): st.markdown(f"- {a}")
         with tabs_d[1]:
-            for m in result.get("missing_info", []): st.warning(m)
+            for m in result.get("missing_information", []): st.warning(m)
         with tabs_d[2]:
-            for r in result.get("risk_notes", []): st.error(r)
+            for r in result.get("risk_warnings", []): st.error(r)
         with tabs_d[3]:
             for o in result.get("optional_clauses", []): st.markdown(f"- {o}")
         st.markdown("<br>", unsafe_allow_html=True)
@@ -353,12 +361,19 @@ with tab4:
                 except Exception as exc:
                     st.error(f"Generation failed: {exc}")
     if st.session_state.get("cp_result"):
+        import html as _html
         result_cp = st.session_state.cp_result
         policy_doc = result_cp.get("policy_document", "")
         title = result_cp.get("policy_title", policy_type)
         st.divider()
         section(f"📄 {title}")
-        st.markdown(f'<div class="revised-doc">{policy_doc.replace(chr(10),"<br>")}</div>', unsafe_allow_html=True)
+        if policy_doc:
+            safe_policy = _html.escape(policy_doc).replace("\n", "<br>")
+            st.markdown(f'<div class="revised-doc">{safe_policy}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Policy body was empty.")
+            with st.expander("🔍 Debug — raw AI result"):
+                st.json(result_cp)
         cp_tabs = st.tabs(["✅ Implementation Checklist", "🎓 Training", "📞 Reporting",
                            "⚖️ Disciplinary", "🗓️ Review Schedule"])
         with cp_tabs[0]:
@@ -433,14 +448,18 @@ with tab5:
                 except Exception as exc:
                     st.error(f"Drafting failed: {exc}")
     if st.session_state.get("cdd_result"):
+        import html as _html
         result5 = st.session_state.cdd_result
         draft_doc = result5.get("draft_document", "")
         st.divider()
         section("📄 Court Document Draft")
-        st.markdown(
-            f'<div class="revised-doc">{draft_doc.replace(chr(10),"<br>")}</div>',
-            unsafe_allow_html=True,
-        )
+        if draft_doc:
+            safe_court = _html.escape(draft_doc).replace("\n", "<br>")
+            st.markdown(f'<div class="revised-doc">{safe_court}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Draft body was empty.")
+            with st.expander("🔍 Debug — raw AI result"):
+                st.json(result5)
         if result5.get("drafting_notes"):
             section("📝 Drafting Notes")
             for note in result5["drafting_notes"]: st.info(note)

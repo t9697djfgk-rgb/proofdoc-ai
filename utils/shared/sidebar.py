@@ -40,7 +40,7 @@ def render_sidebar(tool_name: str = "") -> str | None:
                 notifications = db.list_notifications(limit=10)
                 if notifications:
                     for n in notifications:
-                        is_unread = not n.get("read_at")
+                        is_unread = not n.get("is_read", False)
                         dot = "🔵 " if is_unread else "   "
                         ts = (n.get("created_at") or "")[:16].replace("T", " ")
                         st.markdown(
@@ -48,7 +48,7 @@ def render_sidebar(tool_name: str = "") -> str | None:
                             f"background:{'rgba(201,168,76,0.08)' if is_unread else 'transparent'};"
                             f"margin-bottom:0.25rem;font-size:0.8rem;line-height:1.4'>"
                             f"{dot}<b>{n.get('title','')}</b><br>"
-                            f"<span style='color:#6b7280'>{n.get('message','')}</span><br>"
+                            f"<span style='color:#6b7280'>{n.get('body','')}</span><br>"
                             f"<span style='color:#9ca3af;font-size:0.72rem'>{ts}</span></div>",
                             unsafe_allow_html=True,
                         )
