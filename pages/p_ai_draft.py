@@ -95,13 +95,16 @@ with tab1:
     if st.session_state.get("da_result"):
         result = st.session_state.da_result
         doc_text = result.get("draft_document", "")
+        # Seed the edit key only when a new document arrives, preserving subsequent edits
+        if st.session_state.get("_da_last_draft") != doc_text:
+            st.session_state["da_edited_text"] = doc_text
+            st.session_state["_da_last_draft"] = doc_text
         st.divider()
         section(f"📄 {result.get('draft_title', doc_type)}")
         if doc_text:
             st.caption("✏️ You can edit the document below before downloading.")
             edited_text = st.text_area(
                 "Document",
-                value=doc_text,
                 height=500,
                 key="da_edited_text",
                 label_visibility="collapsed",
@@ -370,13 +373,15 @@ with tab4:
         result_cp = st.session_state.cp_result
         policy_doc = result_cp.get("policy_document", "")
         title = result_cp.get("policy_title", policy_type)
+        if st.session_state.get("_cp_last_draft") != policy_doc:
+            st.session_state["cp_edited_text"] = policy_doc
+            st.session_state["_cp_last_draft"] = policy_doc
         st.divider()
         section(f"📄 {title}")
         if policy_doc:
             st.caption("✏️ You can edit the policy below before downloading.")
             edited_policy = st.text_area(
                 "Policy",
-                value=policy_doc,
                 height=500,
                 key="cp_edited_text",
                 label_visibility="collapsed",
@@ -462,13 +467,15 @@ with tab5:
     if st.session_state.get("cdd_result"):
         result5 = st.session_state.cdd_result
         draft_doc = result5.get("draft_document", "")
+        if st.session_state.get("_cdd_last_draft") != draft_doc:
+            st.session_state["cdd_edited_text"] = draft_doc
+            st.session_state["_cdd_last_draft"] = draft_doc
         st.divider()
         section("📄 Court Document Draft")
         if draft_doc:
             st.caption("✏️ You can edit the document below before downloading.")
             edited_court = st.text_area(
                 "Court Document",
-                value=draft_doc,
                 height=500,
                 key="cdd_edited_text",
                 label_visibility="collapsed",
