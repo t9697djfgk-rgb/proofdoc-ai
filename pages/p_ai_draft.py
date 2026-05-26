@@ -96,7 +96,8 @@ with tab1:
         result = st.session_state.da_result
         doc_text = result.get("draft_document", "")
         # Seed the edit key only when a new document arrives, preserving subsequent edits
-        if st.session_state.get("_da_last_draft") != doc_text:
+        if ("da_edited_text" not in st.session_state
+                or st.session_state.get("_da_last_draft") != doc_text):
             st.session_state["da_edited_text"] = doc_text
             st.session_state["_da_last_draft"] = doc_text
         st.divider()
@@ -124,8 +125,9 @@ with tab1:
         with tabs_d[3]:
             for o in result.get("optional_clauses", []): st.markdown(f"- {o}")
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=edited_text, base_filename="legal_draft",
-                   report_data=result, reset_keys=["da_result", "da_edited_text"], key_prefix="da")
+        action_row(text_to_download=st.session_state.get("da_edited_text", edited_text),
+                   base_filename="legal_draft", report_data=result,
+                   reset_keys=["da_result", "da_edited_text", "_da_last_draft"], key_prefix="da")
 
 # ── 2. Legal Memo Generator ───────────────────────────────────────
 with tab2:
@@ -373,7 +375,8 @@ with tab4:
         result_cp = st.session_state.cp_result
         policy_doc = result_cp.get("policy_document", "")
         title = result_cp.get("policy_title", policy_type)
-        if st.session_state.get("_cp_last_draft") != policy_doc:
+        if ("cp_edited_text" not in st.session_state
+                or st.session_state.get("_cp_last_draft") != policy_doc):
             st.session_state["cp_edited_text"] = policy_doc
             st.session_state["_cp_last_draft"] = policy_doc
         st.divider()
@@ -404,8 +407,9 @@ with tab4:
         with cp_tabs[4]:
             st.markdown(result_cp.get("review_schedule",""))
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=edited_policy, base_filename="compliance_policy",
-                   report_data=result_cp, reset_keys=["cp_result", "cp_edited_text"], key_prefix="cp")
+        action_row(text_to_download=st.session_state.get("cp_edited_text", edited_policy),
+                   base_filename="compliance_policy", report_data=result_cp,
+                   reset_keys=["cp_result", "cp_edited_text", "_cp_last_draft"], key_prefix="cp")
 
 # ── 5. Court Document Drafting ────────────────────────────────────
 with tab5:
@@ -467,7 +471,8 @@ with tab5:
     if st.session_state.get("cdd_result"):
         result5 = st.session_state.cdd_result
         draft_doc = result5.get("draft_document", "")
-        if st.session_state.get("_cdd_last_draft") != draft_doc:
+        if ("cdd_edited_text" not in st.session_state
+                or st.session_state.get("_cdd_last_draft") != draft_doc):
             st.session_state["cdd_edited_text"] = draft_doc
             st.session_state["_cdd_last_draft"] = draft_doc
         st.divider()
@@ -489,8 +494,9 @@ with tab5:
             section("📝 Drafting Notes")
             for note in result5["drafting_notes"]: st.info(note)
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=edited_court, base_filename="court_document",
-                   report_data=result5, reset_keys=["cdd_result", "cdd_edited_text"], key_prefix="cdd")
+        action_row(text_to_download=st.session_state.get("cdd_edited_text", edited_court),
+                   base_filename="court_document", report_data=result5,
+                   reset_keys=["cdd_result", "cdd_edited_text", "_cdd_last_draft"], key_prefix="cdd")
 
 # ── 6. Template Builder ───────────────────────────────────────────
 with tab6:
