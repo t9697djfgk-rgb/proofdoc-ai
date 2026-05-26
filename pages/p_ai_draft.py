@@ -93,15 +93,21 @@ with tab1:
                     import traceback
                     st.code(traceback.format_exc())
     if st.session_state.get("da_result"):
-        import html as _html
         result = st.session_state.da_result
         doc_text = result.get("draft_document", "")
         st.divider()
         section(f"📄 {result.get('draft_title', doc_type)}")
         if doc_text:
-            safe_html = _html.escape(doc_text).replace("\n", "<br>")
-            st.markdown(f'<div class="revised-doc">{safe_html}</div>', unsafe_allow_html=True)
+            st.caption("✏️ You can edit the document below before downloading.")
+            edited_text = st.text_area(
+                "Document",
+                value=doc_text,
+                height=500,
+                key="da_edited_text",
+                label_visibility="collapsed",
+            )
         else:
+            edited_text = ""
             st.warning("⚠️ Document body was empty.")
             with st.expander("🔍 Full raw result"):
                 st.json(result)
@@ -115,8 +121,8 @@ with tab1:
         with tabs_d[3]:
             for o in result.get("optional_clauses", []): st.markdown(f"- {o}")
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=doc_text, base_filename="legal_draft",
-                   report_data=result, reset_keys=["da_result"], key_prefix="da")
+        action_row(text_to_download=edited_text, base_filename="legal_draft",
+                   report_data=result, reset_keys=["da_result", "da_edited_text"], key_prefix="da")
 
 # ── 2. Legal Memo Generator ───────────────────────────────────────
 with tab2:
@@ -361,16 +367,22 @@ with tab4:
                 except Exception as exc:
                     st.error(f"Generation failed: {exc}")
     if st.session_state.get("cp_result"):
-        import html as _html
         result_cp = st.session_state.cp_result
         policy_doc = result_cp.get("policy_document", "")
         title = result_cp.get("policy_title", policy_type)
         st.divider()
         section(f"📄 {title}")
         if policy_doc:
-            safe_policy = _html.escape(policy_doc).replace("\n", "<br>")
-            st.markdown(f'<div class="revised-doc">{safe_policy}</div>', unsafe_allow_html=True)
+            st.caption("✏️ You can edit the policy below before downloading.")
+            edited_policy = st.text_area(
+                "Policy",
+                value=policy_doc,
+                height=500,
+                key="cp_edited_text",
+                label_visibility="collapsed",
+            )
         else:
+            edited_policy = ""
             st.warning("⚠️ Policy body was empty.")
             with st.expander("🔍 Debug — raw AI result"):
                 st.json(result_cp)
@@ -387,8 +399,8 @@ with tab4:
         with cp_tabs[4]:
             st.markdown(result_cp.get("review_schedule",""))
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=policy_doc, base_filename="compliance_policy",
-                   report_data=result_cp, reset_keys=["cp_result"], key_prefix="cp")
+        action_row(text_to_download=edited_policy, base_filename="compliance_policy",
+                   report_data=result_cp, reset_keys=["cp_result", "cp_edited_text"], key_prefix="cp")
 
 # ── 5. Court Document Drafting ────────────────────────────────────
 with tab5:
@@ -448,15 +460,21 @@ with tab5:
                 except Exception as exc:
                     st.error(f"Drafting failed: {exc}")
     if st.session_state.get("cdd_result"):
-        import html as _html
         result5 = st.session_state.cdd_result
         draft_doc = result5.get("draft_document", "")
         st.divider()
         section("📄 Court Document Draft")
         if draft_doc:
-            safe_court = _html.escape(draft_doc).replace("\n", "<br>")
-            st.markdown(f'<div class="revised-doc">{safe_court}</div>', unsafe_allow_html=True)
+            st.caption("✏️ You can edit the document below before downloading.")
+            edited_court = st.text_area(
+                "Court Document",
+                value=draft_doc,
+                height=500,
+                key="cdd_edited_text",
+                label_visibility="collapsed",
+            )
         else:
+            edited_court = ""
             st.warning("⚠️ Draft body was empty.")
             with st.expander("🔍 Debug — raw AI result"):
                 st.json(result5)
@@ -464,8 +482,8 @@ with tab5:
             section("📝 Drafting Notes")
             for note in result5["drafting_notes"]: st.info(note)
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=draft_doc, base_filename="court_document",
-                   report_data=result5, reset_keys=["cdd_result"], key_prefix="cdd")
+        action_row(text_to_download=edited_court, base_filename="court_document",
+                   report_data=result5, reset_keys=["cdd_result", "cdd_edited_text"], key_prefix="cdd")
 
 # ── 6. Template Builder ───────────────────────────────────────────
 with tab6:
