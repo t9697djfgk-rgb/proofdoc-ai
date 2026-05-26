@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 import streamlit as st
-from docx.shared import Pt, RGBColor
 
 
 def download_txt(label: str, text: str, filename: str, key: str | None = None) -> None:
@@ -40,14 +39,14 @@ def download_md(label: str, text: str, filename: str, key: str | None = None) ->
 
 
 _BODY_FONT = "Book Antiqua"
-_BODY_SIZE = Pt(12)
 
 
 def _style_run(run, bold: bool = False, size=None, color=None) -> None:
     """Apply standard font styling to a run."""
-    from docx.shared import Pt, RGBColor
+    from docx.shared import Pt
+    _body_size = Pt(12)
     run.font.name = _BODY_FONT
-    run.font.size = size or _BODY_SIZE
+    run.font.size = size or _body_size
     run.font.bold = bold
     if color:
         run.font.color.rgb = color
