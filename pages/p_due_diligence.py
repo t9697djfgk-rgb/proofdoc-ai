@@ -2,7 +2,7 @@ import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, disclaimer, confidentiality_notice, section, risk_badge
 from utils.shared.document_input import document_input_ui
-from utils.shared.export_utils import download_json
+from utils.shared.export_utils import download_json, download_docx_from_dict, save_to_matter_ui, dict_to_markdown
 
 from utils.auth import require_lawyer
 api_key = setup_page()
@@ -97,10 +97,18 @@ if st.session_state.get("dd_result"):
                 st.markdown(f"- {item}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    c1, _, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
-        download_json("📥 Download DD Report (.json)", result, "due_diligence_report.json", key="dd_dl")
-    with c3:
+        download_json("📥 Export (.json)", result, "due_diligence_report.json", key="dd_dl")
+    with c2:
+        download_docx_from_dict("📝 Download (.docx)", result, "due_diligence_report.docx",
+                                title="Due Diligence Report", key="dd_dl_docx")
+    with c4:
         if st.button("🔄 Reset", use_container_width=True, key="dd_reset"):
             st.session_state.pop("dd_result", None)
             st.rerun()
+    save_to_matter_ui(
+        text=dict_to_markdown(result, title="Due Diligence Report"),
+        doc_title=f"Due Diligence Report — {matter_type}",
+        key_prefix="dd",
+    )

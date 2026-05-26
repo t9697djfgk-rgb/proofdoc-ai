@@ -2,7 +2,7 @@ import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, disclaimer, section, group_header
 from utils.shared.document_input import document_input_ui
-from utils.shared.export_utils import download_json
+from utils.shared.export_utils import download_json, download_docx_from_dict, save_to_matter_ui, dict_to_markdown
 
 from utils.auth import require_lawyer
 api_key = setup_page()
@@ -83,11 +83,15 @@ with tab1:
                 else:
                     st.success("No issues in this category.")
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Download Review Report (.json)", result1, "court_doc_review.json", key="cdc_dl")
-        with c3:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: download_json("📥 Export (.json)", result1, "court_doc_review.json", key="cdc_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", result1, "court_doc_review.docx",
+                                          title="Court Document Review", key="cdc_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="cdc_rst", use_container_width=True):
                 st.session_state.pop("cdc_result", None); st.rerun()
+        save_to_matter_ui(dict_to_markdown(result1, title="Court Document Review"),
+                          "Court Document Review", "cdc")
 
 # ── 2. Matter Timeline ────────────────────────────────────────────
 with tab2:
@@ -159,11 +163,15 @@ with tab2:
             section("📌 Undated Events")
             for u in undated: st.markdown(f"- {u}")
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Download Timeline (.json)", result2, "matter_timeline.json", key="tg_dl")
-        with c3:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: download_json("📥 Export (.json)", result2, "matter_timeline.json", key="tg_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", result2, "matter_timeline.docx",
+                                          title="Matter Timeline", key="tg_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="tg_rst", use_container_width=True):
                 st.session_state.pop("tg_result", None); st.rerun()
+        save_to_matter_ui(dict_to_markdown(result2, title="Matter Timeline"),
+                          "Matter Timeline", "tg")
 
 # ── 3. Filing Checklist ───────────────────────────────────────────
 with tab3:
@@ -242,13 +250,17 @@ with tab3:
         if r.get("service_requirements"):
             section("📮 Service Requirements")
             st.markdown(r["service_requirements"])
-        c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Export Checklist (.json)", r, "filing_checklist.json", key="fc_dl")
-        with c3:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: download_json("📥 Export (.json)", r, "filing_checklist.json", key="fc_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", r, "filing_checklist.docx",
+                                          title="Filing Checklist", key="fc_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="fc_rst", use_container_width=True):
                 st.session_state.pop("fc_result", None)
                 st.session_state.pop("fc_completed", None)
                 st.rerun()
+        save_to_matter_ui(dict_to_markdown(r, title="Filing Checklist"),
+                          f"Filing Checklist — {fc_doc_type}", "fc")
 
 # ── 4. Argument Builder ───────────────────────────────────────────
 with tab4:
@@ -313,11 +325,15 @@ with tab4:
                 st.markdown(f"→ {p}")
         with ab_tabs[6]:
             st.markdown(r.get("full_written_argument",""))
-        c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Export Argument (.json)", r, "legal_argument.json", key="ab_dl")
-        with c3:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: download_json("📥 Export (.json)", r, "legal_argument.json", key="ab_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", r, "legal_argument.docx",
+                                          title="Legal Argument", key="ab_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="ab_rst", use_container_width=True):
                 st.session_state.pop("ab_result", None); st.rerun()
+        save_to_matter_ui(dict_to_markdown(r, title="Legal Argument"),
+                          f"Legal Argument — {ab_issue[:50]}", "ab")
 
 # ── 5. Hearing Prep Notes ─────────────────────────────────────────
 with tab5:
@@ -377,8 +393,12 @@ with tab5:
             st.markdown(r.get("closing_summary",""))
         with hp_tabs[5]:
             for item in r.get("logistics_checklist",[]): st.checkbox(item, key=f"hp_log_{item[:20]}")
-        c1, _, c3 = st.columns(3)
-        with c1: download_json("📥 Export Hearing Notes (.json)", r, "hearing_prep.json", key="hp_dl")
-        with c3:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: download_json("📥 Export (.json)", r, "hearing_prep.json", key="hp_dl")
+        with c2: download_docx_from_dict("📝 Download (.docx)", r, "hearing_prep.docx",
+                                          title="Hearing Preparation Notes", key="hp_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="hp_rst", use_container_width=True):
                 st.session_state.pop("hp_result", None); st.rerun()
+        save_to_matter_ui(dict_to_markdown(r, title="Hearing Preparation Notes"),
+                          f"Hearing Prep — {hp_type}", "hp")

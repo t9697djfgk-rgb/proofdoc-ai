@@ -124,6 +124,58 @@ if st.session_state.get("ci_result"):
             else:
                 st.error("Failed to create matter — make sure you are logged in.")
 
+    # ── Auto-generate Engagement Letter ───────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    section("📝 Generate Engagement Letter")
+    st.markdown("One click to draft an engagement letter pre-filled with this intake data.")
+    if st.button("📝 Generate Engagement Letter", type="primary",
+                 disabled=not api_key, key="ci_eng_btn"):
+        from utils.drafting_assistant import DraftingAssistant
+        with st.spinner("Drafting engagement letter with Claude Opus 4.7…"):
+            try:
+                _eng_facts = (
+                    f"Client: {client_name}\n"
+                    f"Matter type: {result.get('matter_classification', matter_type)}\n"
+                    f"Complexity: {result.get('complexity', '')}\n"
+                    f"Estimated timeline: {result.get('estimated_timeline', '')}\n"
+                    f"Key issues: {'; '.join(result.get('key_issues', [])[:4])}\n"
+                    f"Next steps: {'; '.join(result.get('next_steps', [])[:3])}\n"
+                    f"Urgency: {urgency}\n"
+                    f"Referred by: {referred_by}"
+                )
+                _eng_result = DraftingAssistant(api_key).draft(
+                    doc_type="Client Engagement Letter",
+                    jurisdiction="International / Neutral",
+                    legal_style="Formal commercial",
+                    parties=f"Law Firm (solicitor); {client_name} (client)",
+                    key_facts=_eng_facts,
+                    tone="Formal",
+                    additional="Professional engagement letter confirming scope of services, fee arrangement, and client obligations.",
+                )
+                st.session_state.ci_eng_result = _eng_result
+                st.success("✅ Engagement letter drafted!")
+            except Exception as exc:
+                st.error(f"Generation failed: {exc}")
+
+    if st.session_state.get("ci_eng_result"):
+        _er = st.session_state.ci_eng_result
+        _eng_doc = _er.get("draft_document", "")
+        if ("ci_eng_edited" not in st.session_state
+                or st.session_state.get("_ci_eng_last") != _eng_doc[:120]):
+            st.session_state["ci_eng_edited"] = _eng_doc
+            st.session_state["_ci_eng_last"] = _eng_doc[:120]
+        st.caption("✏️ Edit the letter below before downloading.")
+        st.text_area("Engagement Letter", height=500, key="ci_eng_edited",
+                     label_visibility="collapsed")
+        from utils.shared.export_utils import action_row as _ar, save_to_matter_ui as _stm
+        _ar(text_to_download=st.session_state.get("ci_eng_edited", _eng_doc),
+            base_filename="engagement_letter",
+            reset_keys=["ci_eng_result", "ci_eng_edited", "_ci_eng_last"],
+            key_prefix="ci_eng",
+            doc_title="Client Engagement Letter")
+        _stm(st.session_state.get("ci_eng_edited", _eng_doc),
+             f"Engagement Letter — {client_name}", "ci_eng")
+
     st.markdown("<br>", unsafe_allow_html=True)
     action_row(
         text_to_download=handover,

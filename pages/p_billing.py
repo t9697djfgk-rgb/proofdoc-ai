@@ -28,6 +28,42 @@ with tab_time:
     }
 
     section("Log Time")
+
+    # ── AI description helper (outside form) ──────────────────────
+    with st.expander("🤖 AI — Suggest a Professional Billing Description", expanded=False):
+        st.caption("Describe what you did in plain language; AI will generate a professional billing narrative.")
+        _ai_task = st.text_input("What did you work on?",
+                                  placeholder="e.g. reviewed NDA, advised client on termination clause",
+                                  key="bt_ai_task")
+        _ai_matter_type = st.selectbox("Matter Type", [
+            "Commercial contract", "Litigation", "Corporate / M&A", "Employment",
+            "Property", "Criminal", "Regulatory / Compliance", "General advice",
+        ], key="bt_ai_mtype")
+        if st.button("✨ Generate Description", key="bt_ai_btn", disabled=not api_key):
+            if _ai_task.strip():
+                import anthropic as _anth
+                with st.spinner("Generating…"):
+                    try:
+                        _c = _anth.Anthropic(api_key=api_key)
+                        _r = _c.messages.create(
+                            model="claude-haiku-4-5",
+                            max_tokens=120,
+                            messages=[{"role": "user", "content":
+                                f"Write a single concise professional billing description (max 15 words, no quotes) "
+                                f"for a lawyer who: {_ai_task}. Matter type: {_ai_matter_type}. "
+                                f"Use formal legal billing language (e.g. 'Reviewing and advising on…', "
+                                f"'Drafting and settling…', 'Attendance upon client regarding…')."}],
+                        )
+                        _suggestion = next((b.text for b in _r.content if b.type == "text"), "")
+                        st.session_state["bt_ai_suggestion"] = _suggestion.strip().strip('"')
+                    except Exception as _exc:
+                        st.error(f"AI failed: {_exc}")
+            else:
+                st.warning("Describe what you worked on first.")
+        if st.session_state.get("bt_ai_suggestion"):
+            st.success(f"📋 **Suggested:** {st.session_state['bt_ai_suggestion']}")
+            st.caption("Copy the description above and paste it into the Description field below.")
+
     with st.form("billing_time", clear_on_submit=True):
         c1, c2 = st.columns(2)
         bt_matter = c1.selectbox("Matter", list(matter_options.keys()), key="bt_m")

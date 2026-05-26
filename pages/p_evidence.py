@@ -2,7 +2,7 @@ import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, disclaimer, confidentiality_notice, section
 from utils.shared.document_input import document_input_ui
-from utils.shared.export_utils import download_json
+from utils.shared.export_utils import download_json, download_docx_from_dict, save_to_matter_ui, dict_to_markdown
 
 from utils.auth import require_lawyer
 api_key = setup_page()
@@ -109,13 +109,18 @@ with tab1:
                 st.markdown(f"- {t}")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            download_json("📥 Download Analysis (.json)", result1, "evidence_analysis.json", key="ea_dl")
-        with c3:
+            download_json("📥 Export (.json)", result1, "evidence_analysis.json", key="ea_dl")
+        with c2:
+            download_docx_from_dict("📝 Download (.docx)", result1, "evidence_analysis.docx",
+                                    title="Evidence Analysis", key="ea_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="ea_rst", use_container_width=True):
                 st.session_state.pop("ea_result", None)
                 st.rerun()
+        save_to_matter_ui(dict_to_markdown(result1, title="Evidence Analysis"),
+                          "Evidence Analysis", "ea")
 
 # ── 2. Witness Statement Analyzer ────────────────────────────────
 with tab2:
@@ -207,13 +212,18 @@ with tab2:
             for n in r.get("deposition_notes", []):
                 st.markdown(f"- {n}")
 
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            download_json("📥 Download Analysis (.json)", r, "witness_analysis.json", key="wa_dl")
-        with c3:
+            download_json("📥 Export (.json)", r, "witness_analysis.json", key="wa_dl")
+        with c2:
+            download_docx_from_dict("📝 Download (.docx)", r, "witness_analysis.docx",
+                                    title="Witness Statement Analysis", key="wa_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="wa_rst", use_container_width=True):
                 st.session_state.pop("wa_result", None)
                 st.rerun()
+        save_to_matter_ui(dict_to_markdown(r, title="Witness Statement Analysis"),
+                          "Witness Statement Analysis", "wa")
 
 # ── 3. Cross-Examination Questions ───────────────────────────────
 with tab3:
@@ -295,10 +305,15 @@ with tab3:
             for t in r["traps_to_avoid"]:
                 st.warning(t)
 
-        c1, _, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            download_json("📥 Export Cross-Exam Plan (.json)", r, "cross_examination.json", key="ce_dl")
-        with c3:
+            download_json("📥 Export (.json)", r, "cross_examination.json", key="ce_dl")
+        with c2:
+            download_docx_from_dict("📝 Download (.docx)", r, "cross_examination.docx",
+                                    title="Cross-Examination Plan", key="ce_dl_docx")
+        with c4:
             if st.button("🔄 Reset", key="ce_rst", use_container_width=True):
                 st.session_state.pop("ce_result", None)
                 st.rerun()
+        save_to_matter_ui(dict_to_markdown(r, title="Cross-Examination Plan"),
+                          "Cross-Examination Plan", "ce")

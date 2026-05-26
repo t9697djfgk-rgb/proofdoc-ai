@@ -403,3 +403,42 @@ def action_row(
                 for k in reset_keys:
                     st.session_state.pop(k, None)
             st.rerun()
+
+
+def save_to_matter_ui(text: str, doc_title: str, key_prefix: str) -> None:
+    """Expander that saves an AI-generated document to the Document Library under a matter."""
+    with st.expander("💾 Save to Matter / Document Library"):
+        import utils.database as _db
+        matters = []
+        try:
+            matters = _db.list_matters(status="Active")
+        except Exception:
+            pass
+        if not matters:
+            st.info("No active matters found. Create a matter in the Matters page first.")
+            return
+        matter_opts = {
+            f"{m.get('ref', '')} — {(m.get('title') or '')[:40]}": m["id"]
+            for m in matters
+        }
+        sel = st.selectbox("Select Matter", list(matter_opts.keys()),
+                           key=f"{key_prefix}_stm_sel")
+        doc_name = st.text_input("Document Name", value=doc_title,
+                                  key=f"{key_prefix}_stm_name")
+        if st.button("💾 Save Document", key=f"{key_prefix}_stm_btn", type="primary",
+                     use_container_width=True):
+            mid = matter_opts[sel]
+            saved = _db.add_document(
+                name=doc_name.strip() or doc_title,
+                matter_id=mid,
+                file_type="text/plain",
+                file_size=len((text or "").encode()),
+                description=(text or "")[:10000],
+                visibility="internal",
+            )
+            if saved:
+                matter_label = sel.split("—")[0].strip()
+                st.success(f"✅ Saved to **{matter_label}**. View it in Documents.")
+                st.session_state.pop(f"{key_prefix}_stm_saved", None)
+            else:
+                st.error("Save failed — check Supabase connection.")

@@ -1,7 +1,7 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
 from utils.shared.styles import slim_header, disclaimer, section
-from utils.shared.export_utils import action_row, download_json
+from utils.shared.export_utils import action_row, download_json, save_to_matter_ui
 
 from utils.auth import require_lawyer
 api_key = setup_page()
@@ -46,8 +46,25 @@ with tab1:
     additional = c2b.text_area("Additional Instructions", height=60,
         placeholder="Any clauses to include/exclude, specific language requirements…", key="da_add")
 
-    # ── Rwanda Law Library selector ────────────────────────────────
+    # ── Matter context selector ────────────────────────────────────
     import utils.database as _db2
+    _da_matters = []
+    try:
+        _da_matters = _db2.list_matters(status="Active")
+    except Exception:
+        pass
+    if _da_matters:
+        with st.expander("📁 Link to Matter (optional — adds matter context to draft)", expanded=False):
+            _da_matter_opts = {"— No matter context —": None} | {
+                f"{m.get('ref','')} — {(m.get('title') or '')[:40]}": m for m in _da_matters
+            }
+            st.selectbox("Select Matter", list(_da_matter_opts.keys()), key="da_matter_ctx")
+            if st.session_state.get("da_matter_ctx") and st.session_state["da_matter_ctx"] != "— No matter context —":
+                _sel_m = _da_matter_opts.get(st.session_state["da_matter_ctx"])
+                if _sel_m:
+                    st.caption(f"🏷️ {_sel_m.get('matter_type','')} · {_sel_m.get('jurisdiction','')} · Client: {_sel_m.get('client_name','—')}")
+
+    # ── Rwanda Law Library selector ────────────────────────────────
     _all_laws = []
     try:
         _all_laws = _db2.list_laws()
@@ -82,7 +99,20 @@ with tab1:
                         _ltxt = _db2.get_law_text(_lid)
                         if _ltxt:
                             _law_ctx += f"\n\n=== APPLICABLE RWANDA LAW: {_ltitle} ===\n{_ltxt[:30_000]}\n=== END ==="
-                    _additional_with_laws = (additional or "") + _law_ctx
+                    _matter_ctx = ""
+                    _da_ctx_key = st.session_state.get("da_matter_ctx", "— No matter context —")
+                    if _da_ctx_key and _da_ctx_key != "— No matter context —":
+                        _sel_m = _da_matter_opts.get(_da_ctx_key)
+                        if _sel_m:
+                            _matter_ctx = (
+                                f"\n\nMATTER CONTEXT: {_sel_m.get('title','')} | "
+                                f"Type: {_sel_m.get('matter_type','')} | "
+                                f"Jurisdiction: {_sel_m.get('jurisdiction','')} | "
+                                f"Ref: {_sel_m.get('ref','')}"
+                            )
+                            if _sel_m.get("description"):
+                                _matter_ctx += f"\nDescription: {_sel_m['description'][:500]}"
+                    _additional_with_laws = (additional or "") + _law_ctx + _matter_ctx
                     result = DraftingAssistant(api_key).draft(
                         doc_type, jurisdiction, legal_style, parties, key_facts, tone, _additional_with_laws
                     )
@@ -127,7 +157,10 @@ with tab1:
         st.markdown("<br>", unsafe_allow_html=True)
         action_row(text_to_download=st.session_state.get("da_edited_text", edited_text),
                    base_filename="legal_draft", report_data=result,
-                   reset_keys=["da_result", "da_edited_text", "_da_last_draft"], key_prefix="da")
+                   reset_keys=["da_result", "da_edited_text", "_da_last_draft"], key_prefix="da",
+                   doc_title=result.get("draft_title", doc_type))
+        save_to_matter_ui(st.session_state.get("da_edited_text", ""),
+                          result.get("draft_title", doc_type), "da")
 
 # ── 2. Legal Memo Generator ───────────────────────────────────────
 with tab2:
@@ -183,9 +216,23 @@ with tab2:
                 full_memo += f"{label}\n{'='*40}\n{content}\n\n"
         for r in result_m.get("risks", []): st.warning(r)
         for r in result_m.get("recommendations", []): st.markdown(f"- {r}")
+        # Editable text area with shadow key pattern
+        if ("lm_edited_text" not in st.session_state
+                or st.session_state.get("_lm_last_memo") != full_memo[:120]):
+            st.session_state["lm_edited_text"] = full_memo
+            st.session_state["_lm_last_memo"] = full_memo[:120]
+        st.divider()
+        st.caption("✏️ You can edit the memo below before downloading.")
+        lm_edited = st.text_area("Memo", height=500, key="lm_edited_text",
+                                  label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
-        action_row(text_to_download=full_memo, base_filename="legal_memo",
-                   report_data=result_m, reset_keys=["lm_result"], key_prefix="lm")
+        action_row(text_to_download=st.session_state.get("lm_edited_text", lm_edited),
+                   base_filename="legal_memo", report_data=result_m,
+                   reset_keys=["lm_result", "lm_edited_text", "_lm_last_memo"],
+                   key_prefix="lm", doc_title="Legal Memorandum")
+        from utils.shared.export_utils import save_to_matter_ui as _stm
+        _stm(st.session_state.get("lm_edited_text", full_memo),
+             f"Legal Memo — {legal_issue[:50]}", "lm")
 
 # ── 3. Clause Library ─────────────────────────────────────────────
 with tab3:
@@ -409,7 +456,10 @@ with tab4:
         st.markdown("<br>", unsafe_allow_html=True)
         action_row(text_to_download=st.session_state.get("cp_edited_text", edited_policy),
                    base_filename="compliance_policy", report_data=result_cp,
-                   reset_keys=["cp_result", "cp_edited_text", "_cp_last_draft"], key_prefix="cp")
+                   reset_keys=["cp_result", "cp_edited_text", "_cp_last_draft"], key_prefix="cp",
+                   doc_title=result_cp.get("policy_title", policy_type))
+        save_to_matter_ui(st.session_state.get("cp_edited_text", ""),
+                          result_cp.get("policy_title", policy_type), "cp")
 
 # ── 5. Court Document Drafting ────────────────────────────────────
 with tab5:
@@ -496,7 +546,10 @@ with tab5:
         st.markdown("<br>", unsafe_allow_html=True)
         action_row(text_to_download=st.session_state.get("cdd_edited_text", edited_court),
                    base_filename="court_document", report_data=result5,
-                   reset_keys=["cdd_result", "cdd_edited_text", "_cdd_last_draft"], key_prefix="cdd")
+                   reset_keys=["cdd_result", "cdd_edited_text", "_cdd_last_draft"], key_prefix="cdd",
+                   doc_title=result5.get("draft_title", cdd_doc_type))
+        save_to_matter_ui(st.session_state.get("cdd_edited_text", ""),
+                          result5.get("draft_title", cdd_doc_type), "cdd")
 
 # ── 6. Template Builder ───────────────────────────────────────────
 with tab6:
