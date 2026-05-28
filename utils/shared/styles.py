@@ -1332,3 +1332,4 @@ def stat_strip(value: str, label: str, delta: str = "") -> str:
         f'<div class="sl">{label}</div>'
         f'{delta_html}</div>'
     )
+
