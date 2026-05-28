@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import inject_css, slim_header
+from utils.shared.styles import inject_css, slim_header, currency_sym
 from utils.auth import require_lawyer
 import utils.database as db
 from datetime import date
@@ -114,9 +114,10 @@ today = date.today()
 hour  = __import__("datetime").datetime.now().hour
 greeting = "Good morning" if hour < 12 else ("Good afternoon" if hour < 17 else "Good evening")
 
-st.markdown(
+_greet_col, _ref_col = st.columns([9, 1])
+_greet_col.markdown(
     f"""
-    <div style="margin-bottom:1.5rem">
+    <div style="margin-bottom:1.25rem">
       <h2 style="font-family:'Playfair Display',serif;color:#1a2744;margin:0;font-size:1.75rem">
         {greeting}, {first_name} 👋
       </h2>
@@ -127,11 +128,25 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+_ref_col.markdown("<div style='height:1.1rem'></div>", unsafe_allow_html=True)
+_dash_refresh = _ref_col.button("↻", key="dash_refresh", help="Refresh dashboard data",
+                                 use_container_width=True)
 
 # ── Load data ─────────────────────────────────────────────────────
-stats   = db.dashboard_stats()
-billing = db.billing_analytics()
-notifs  = db.list_notifications(limit=8)
+_dash_loaded = st.session_state.get("_dash_loaded_key") == st.session_state.get("user", {}).get("id")
+if not _dash_loaded:
+    with st.spinner("Loading your dashboard…"):
+        stats   = db.dashboard_stats()
+        billing = db.billing_analytics()
+        notifs  = db.list_notifications(limit=8)
+    st.session_state["_dash_stats"]   = stats
+    st.session_state["_dash_billing"] = billing
+    st.session_state["_dash_notifs"]  = notifs
+    st.session_state["_dash_loaded_key"] = st.session_state.get("user", {}).get("id")
+else:
+    stats   = st.session_state.get("_dash_stats",   {})
+    billing = st.session_state.get("_dash_billing", {})
+    notifs  = st.session_state.get("_dash_notifs",  [])
 
 active_matters  = stats.get("active_matters", 0)
 total_clients   = stats.get("total_clients",  0)
@@ -145,6 +160,10 @@ recent_activity = stats.get("recent_activity", [])
 rev_month = billing.get("revenue_month", 0)
 wip       = billing.get("wip", 0)
 
+if _dash_refresh:
+    st.session_state.pop("_dash_loaded_key", None)
+    st.rerun()
+
 # ── KPI Cards (6 cards: 3+3) ──────────────────────────────────────
 CARDS_ROW1 = [
     ("⚖️", "Active Matters", active_matters, "#1a2744", "#e8f0fe", None),
@@ -154,8 +173,8 @@ CARDS_ROW1 = [
 CARDS_ROW2 = [
     ("⚠️", "Overdue Tasks",     overdue_tasks,                  "#dc2626", "#fef2f2",
      "Needs attention" if overdue_tasks else "All on track"),
-    ("💰", "Revenue This Month", f"£{rev_month:,.0f}",          "#7c3aed", "#f5f3ff", None),
-    ("⏳", "WIP (Unbilled)",     f"£{wip:,.0f}",                "#0891b2", "#ecfeff", None),
+    ("💰", "Revenue This Month", f"{currency_sym()}{rev_month:,.0f}",  "#7c3aed", "#f5f3ff", None),
+    ("⏳", "WIP (Unbilled)",     f"{currency_sym()}{wip:,.0f}",        "#0891b2", "#ecfeff", None),
 ]
 
 for row in [CARDS_ROW1, CARDS_ROW2]:
@@ -241,7 +260,7 @@ if _by_status or _top_m:
                         f'<div style="margin-bottom:.35rem">'
                         f'<div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.15rem">'
                         f'<span style="color:#374151">{_tm["ref"]} {_tm["title"][:18]}</span>'
-                        f'<span style="font-weight:600;color:#059669">£{_tm["value"]:,.0f}</span></div>'
+                        f'<span style="font-weight:600;color:#059669">{currency_sym()}{_tm["value"]:,.0f}</span></div>'
                         f'<div style="background:#f1f5f9;border-radius:4px;height:6px">'
                         f'<div style="background:#059669;width:{_pct:.0f}%;height:6px;border-radius:4px"></div></div></div>',
                         unsafe_allow_html=True,

@@ -37,17 +37,9 @@ elif user["role"] == "admin":
                 st.Page("pages/p_admin.py",            title="Admin Panel", icon="🛡️"),
             ],
             "Matters": [
-                st.Page("pages/p_matters_list.py",   title="Matters",        icon="📁"),
-                st.Page("pages/p_client_intake.py",  title="Client Intake",  icon="👤"),
-                st.Page("pages/p_due_diligence.py",  title="Due Diligence",  icon="🏢"),
-            ],
-            "Collaboration": [
-                st.Page("pages/p_matter_discussion.py", title="Discussions", icon="💬"),
-            ],
-            "Documents": [
-                st.Page("pages/p_doc_library.py",  title="Document Library",  icon="📚"),
-                st.Page("pages/p_doc_convert.py",  title="Convert & Process", icon="🔄"),
-                st.Page("pages/p_doc_manage.py",   title="Manage & Compare",  icon="🗂️"),
+                st.Page("pages/p_matters_list.py",   title="Matters",       icon="📁"),
+                st.Page("pages/p_client_intake.py",  title="Client Intake", icon="👤"),
+                st.Page("pages/p_due_diligence.py",  title="Due Diligence", icon="🏢"),
             ],
             "AI Tools": [
                 st.Page("pages/p_ai_chat.py",        title="AI Assistant",  icon="💬"),
@@ -58,15 +50,23 @@ elif user["role"] == "admin":
                 st.Page("pages/p_ai_research.py",    title="Research",      icon="🔬"),
                 st.Page("pages/p_ai_calculators.py", title="Calculators",   icon="🧮"),
             ],
+            "Operations": [
+                st.Page("pages/p_operations.py",   title="Tasks & Calendar", icon="📅"),
+                st.Page("pages/p_billing.py",      title="Billing & Time",   icon="💼"),
+                st.Page("pages/p_integrations.py", title="Integrations",     icon="🔗"),
+            ],
+            "Documents": [
+                st.Page("pages/p_doc_library.py",  title="Document Library",  icon="📚"),
+                st.Page("pages/p_doc_convert.py",  title="Convert & Process", icon="🔄"),
+                st.Page("pages/p_doc_manage.py",   title="Manage & Compare",  icon="🗂️"),
+            ],
             "Trial": [
                 st.Page("pages/p_trial.py",    title="Trial Workspace",      icon="🏛️"),
                 st.Page("pages/p_evidence.py", title="Evidence & Witnesses", icon="🧪"),
                 st.Page("pages/p_bundles.py",  title="Trial Bundles",        icon="📦"),
             ],
-            "Operations": [
-                st.Page("pages/p_operations.py",   title="Tasks & Calendar", icon="📅"),
-                st.Page("pages/p_billing.py",      title="Billing & Time",   icon="💼"),
-                st.Page("pages/p_integrations.py", title="Integrations",     icon="🔗"),
+            "Collaboration": [
+                st.Page("pages/p_matter_discussion.py", title="Discussions", icon="💬"),
             ],
             "Compliance": [
                 st.Page("pages/p_compliance.py", title="Compliance Tools", icon="🛡️"),
@@ -92,14 +92,6 @@ else:
                 st.Page("pages/p_client_intake.py",  title="Client Intake", icon="👤"),
                 st.Page("pages/p_due_diligence.py",  title="Due Diligence", icon="🏢"),
             ],
-            "Collaboration": [
-                st.Page("pages/p_matter_discussion.py", title="Discussions", icon="💬"),
-            ],
-            "Documents": [
-                st.Page("pages/p_doc_library.py",  title="Document Library",  icon="📚"),
-                st.Page("pages/p_doc_convert.py",  title="Convert & Process", icon="🔄"),
-                st.Page("pages/p_doc_manage.py",   title="Manage & Compare",  icon="🗂️"),
-            ],
             "AI Tools": [
                 st.Page("pages/p_ai_chat.py",        title="AI Assistant",  icon="💬"),
                 st.Page("pages/p_law_library.py",    title="Law Library",   icon="⚖️"),
@@ -109,15 +101,23 @@ else:
                 st.Page("pages/p_ai_research.py",    title="Research",      icon="🔬"),
                 st.Page("pages/p_ai_calculators.py", title="Calculators",   icon="🧮"),
             ],
+            "Operations": [
+                st.Page("pages/p_operations.py",   title="Tasks & Calendar", icon="📅"),
+                st.Page("pages/p_billing.py",      title="Billing & Time",   icon="💼"),
+                st.Page("pages/p_integrations.py", title="Integrations",     icon="🔗"),
+            ],
+            "Documents": [
+                st.Page("pages/p_doc_library.py",  title="Document Library",  icon="📚"),
+                st.Page("pages/p_doc_convert.py",  title="Convert & Process", icon="🔄"),
+                st.Page("pages/p_doc_manage.py",   title="Manage & Compare",  icon="🗂️"),
+            ],
             "Trial": [
                 st.Page("pages/p_trial.py",    title="Trial Workspace",      icon="🏛️"),
                 st.Page("pages/p_evidence.py", title="Evidence & Witnesses", icon="🧪"),
                 st.Page("pages/p_bundles.py",  title="Trial Bundles",        icon="📦"),
             ],
-            "Operations": [
-                st.Page("pages/p_operations.py",   title="Tasks & Calendar", icon="📅"),
-                st.Page("pages/p_billing.py",      title="Billing & Time",   icon="💼"),
-                st.Page("pages/p_integrations.py", title="Integrations",     icon="🔗"),
+            "Collaboration": [
+                st.Page("pages/p_matter_discussion.py", title="Discussions", icon="💬"),
             ],
             "Compliance": [
                 st.Page("pages/p_compliance.py", title="Compliance Tools", icon="🛡️"),

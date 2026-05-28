@@ -116,7 +116,7 @@ html, body, [class*="css"] {
     background: var(--bg) !important;
 }
 [data-testid="stAppViewBlockContainer"] {
-    padding-top: 1.8rem !important;
+    padding-top: 0.5rem !important;
     max-width: 1100px !important;
 }
 [data-testid="block-container"] {
@@ -592,6 +592,29 @@ div[data-testid="stNotification"] { border-radius: var(--radius) !important; }
 }
 
 /* ═══════════════════════════════════════════════════
+   SIDEBAR NAV — "View more" button styled as gold pill
+═══════════════════════════════════════════════════ */
+[data-testid="stSidebarNavViewButton"] {
+    background: rgba(201,168,76,0.12) !important;
+    border: 1px solid rgba(201,168,76,0.35) !important;
+    color: var(--gold-light) !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 0.77rem !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    padding: 0.38rem 0.9rem !important;
+    cursor: pointer !important;
+    transition: var(--transition) !important;
+    margin-top: 0.5rem !important;
+    letter-spacing: 0.02em !important;
+}
+[data-testid="stSidebarNavViewButton"]:hover {
+    background: rgba(201,168,76,0.22) !important;
+    border-color: rgba(201,168,76,0.55) !important;
+    color: #ffffff !important;
+}
+
+/* ═══════════════════════════════════════════════════
    SIDEBAR NAV LINKS (page navigation)
 ═══════════════════════════════════════════════════ */
 [data-testid="stSidebarNav"] a {
@@ -705,6 +728,49 @@ div[data-testid="stNotification"] { border-radius: var(--radius) !important; }
     font-size: 0.8rem;
     color: var(--green);
     font-weight: 500;
+}
+
+/* page-accent-bar (injected inline per page) */
+.page-header-wrap {
+    padding: 0.9rem 0 0.85rem;
+    margin-bottom: 1.4rem;
+    animation: fadeInUp 0.3s ease both;
+    position: relative;
+}
+.page-header-wrap::after {
+    content: '';
+    display: block;
+    height: 2.5px;
+    border-radius: 2px;
+    margin-top: 0.8rem;
+    background: var(--page-accent-grad, linear-gradient(90deg, #1a2744, #c9a84c 60%, transparent));
+}
+.page-header-wrap h2 {
+    font-family: 'Playfair Display', serif !important;
+    font-size: 1.65rem !important;
+    color: var(--navy) !important;
+    margin: 0 0 0.15rem !important;
+    font-weight: 700 !important;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+.page-header-wrap .ph-icon-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.page-header-wrap .sub {
+    color: var(--text-muted) !important;
+    font-size: 0.84rem !important;
+    margin: 0 !important;
+    font-weight: 400 !important;
+    padding-left: 2.45rem;
 }
 
 /* section-title */
@@ -1097,27 +1163,68 @@ def inject_css() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
 
 
+_ICON_ACCENTS: dict[str, tuple[str, str, str]] = {
+    # icon → (pill_bg, pill_fg, gradient)
+    "📝": ("#ede9fe", "#6d28d9", "linear-gradient(90deg,#7c3aed,#a78bfa 60%,transparent)"),
+    "🔍": ("#e0f2fe", "#0369a1", "linear-gradient(90deg,#0369a1,#38bdf8 60%,transparent)"),
+    "📋": ("#fef3c7", "#b45309", "linear-gradient(90deg,#d97706,#fbbf24 60%,transparent)"),
+    "🏢": ("#e0e7ff", "#3730a3", "linear-gradient(90deg,#4338ca,#818cf8 60%,transparent)"),
+    "💼": ("#d1fae5", "#065f46", "linear-gradient(90deg,#059669,#34d399 60%,transparent)"),
+    "💬": ("#ede9fe", "#4f46e5", "linear-gradient(90deg,#4f46e5,#a78bfa 60%,transparent)"),
+    "🏛️": ("#fee2e2", "#991b1b", "linear-gradient(90deg,#dc2626,#f87171 60%,transparent)"),
+    "🧪": ("#f3e8ff", "#7e22ce", "linear-gradient(90deg,#9333ea,#c084fc 60%,transparent)"),
+    "📚": ("#e0f2fe", "#075985", "linear-gradient(90deg,#0891b2,#67e8f9 60%,transparent)"),
+    "⚖️": ("#fdf6e3", "#78560a", "linear-gradient(90deg,#c9a84c,#e8c97a 60%,transparent)"),
+    "👤": ("#dbeafe", "#1e40af", "linear-gradient(90deg,#2563eb,#93c5fd 60%,transparent)"),
+    "📊": ("#d1fae5", "#065f46", "linear-gradient(90deg,#059669,#34d399 60%,transparent)"),
+    "🔬": ("#ede9fe", "#5b21b6", "linear-gradient(90deg,#7c3aed,#c4b5fd 60%,transparent)"),
+    "🧮": ("#fef3c7", "#92400e", "linear-gradient(90deg,#d97706,#fde68a 60%,transparent)"),
+    "🛡️": ("#e0e7ff", "#1e3a8a", "linear-gradient(90deg,#1a2744,#3b82f6 60%,transparent)"),
+    "📦": ("#f1f5f9", "#475569", "linear-gradient(90deg,#64748b,#94a3b8 60%,transparent)"),
+    "📅": ("#fce7f3", "#9d174d", "linear-gradient(90deg,#be185d,#f472b6 60%,transparent)"),
+    "🔗": ("#ecfdf5", "#14532d", "linear-gradient(90deg,#16a34a,#4ade80 60%,transparent)"),
+    "⚙️": ("#f1f5f9", "#334155", "linear-gradient(90deg,#475569,#94a3b8 60%,transparent)"),
+    "🚀": ("#fff7ed", "#9a3412", "linear-gradient(90deg,#ea580c,#fb923c 60%,transparent)"),
+}
+_DEFAULT_ACCENT = ("#e8f0fe", "#1a2744",
+                   "linear-gradient(90deg,#1a2744,#c9a84c 60%,transparent)")
+
+
 def page_header(title: str, subtitle: str = "", icon: str = "") -> None:
-    heading = f"{icon} {title}" if icon else title
+    pill_bg, pill_fg, grad = _ICON_ACCENTS.get(icon, _DEFAULT_ACCENT)
+    pill_html = (
+        f'<span class="ph-icon-pill" style="background:{pill_bg};color:{pill_fg}">'
+        f'{icon}</span>' if icon else ""
+    )
     sub_html = f'<p class="sub">{subtitle}</p>' if subtitle else ""
     st.markdown(
-        f'<div class="page-header"><h2>{heading}</h2>{sub_html}</div>',
+        f'<div class="page-header-wrap" style="--page-accent-grad:{grad}">'
+        f'<h2>{pill_html}{title}</h2>{sub_html}</div>',
         unsafe_allow_html=True,
     )
 
 
 def slim_header(icon: str, title: str, subtitle: str = "") -> None:
-    """Alias for page_header with positional icon argument (used across all pages)."""
     page_header(title=title, subtitle=subtitle, icon=icon)
 
 
 def disclaimer() -> None:
-    st.markdown(
+    if st.session_state.get("_disclaimer_dismissed"):
+        st.caption(
+            "ℹ️ AI output does not replace qualified legal advice — verify with a qualified lawyer."
+        )
+        return
+    _c1, _c2 = st.columns([22, 1])
+    _c1.markdown(
         '<div class="disclaimer-box">ℹ️ <strong>Disclaimer:</strong> This tool assists with legal '
         "drafting and review. It does not replace the professional judgment of a qualified lawyer. "
         "Do not rely solely on AI output for final legal decisions.</div>",
         unsafe_allow_html=True,
     )
+    _c2.markdown("<div style='height:0.45rem'></div>", unsafe_allow_html=True)
+    if _c2.button("✕", key="disc_dismiss", help="Dismiss for this session"):
+        st.session_state["_disclaimer_dismissed"] = True
+        st.rerun()
 
 
 def confidentiality_notice() -> None:
@@ -1155,6 +1262,14 @@ def status_badge(status: str) -> str:
 
 def section(title: str) -> None:
     st.markdown(f'<p class="section-title">{title}</p>', unsafe_allow_html=True)
+
+
+_CURRENCY_SYMBOLS = {"USD": "$", "EUR": "€", "GBP": "£", "RWF": "RWF ", "KES": "KES ", "ZAR": "R"}
+
+
+def currency_sym() -> str:
+    """Returns the currency symbol configured in Settings (defaults to USD)."""
+    return _CURRENCY_SYMBOLS.get(st.session_state.get("billing_currency", "USD"), "$")
 
 
 def group_header(title: str) -> None:

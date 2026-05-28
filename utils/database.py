@@ -628,6 +628,102 @@ def delete_clause_db(clause_id: str) -> None:
         pass
 
 
+# ── Auto table migration ───────────────────────────────────────────
+
+_CLAUSE_DDL = """
+CREATE TABLE IF NOT EXISTS clause_library_db (
+    id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID,
+    title           TEXT NOT NULL,
+    category        TEXT DEFAULT '',
+    jurisdiction    TEXT DEFAULT '',
+    clause_text     TEXT DEFAULT '',
+    notes           TEXT DEFAULT '',
+    risk_level      TEXT DEFAULT 'medium',
+    approved        BOOLEAN DEFAULT FALSE,
+    created_by      UUID,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_clause_lib_org ON clause_library_db(organization_id);
+"""
+
+_TEMPLATE_DDL = """
+CREATE TABLE IF NOT EXISTS document_templates (
+    id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID,
+    name            TEXT NOT NULL,
+    category        TEXT DEFAULT '',
+    jurisdiction    TEXT DEFAULT '',
+    body            TEXT DEFAULT '',
+    notes           TEXT DEFAULT '',
+    created_by      UUID,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_doc_tpl_org ON document_templates(organization_id);
+"""
+
+
+def auto_setup_tables() -> tuple[bool, str]:
+    """
+    Attempt to create clause_library_db and document_templates via HTTP.
+    Tries psycopg2 (if DATABASE_URL secret exists) then Supabase pg_meta API.
+    Returns (success, message).
+    """
+    try:
+        _url = st.secrets.get("SUPABASE_URL", "")
+        _key = st.secrets.get("SUPABASE_SERVICE_KEY", "")
+    except Exception:
+        return False, "Secrets not available"
+
+    if not _url or not _key:
+        return False, "Missing SUPABASE_URL or SUPABASE_SERVICE_KEY"
+
+    combined_sql = _CLAUSE_DDL.strip() + "\n" + _TEMPLATE_DDL.strip()
+
+    # Method 1: psycopg2 with DATABASE_URL
+    try:
+        _db_url = st.secrets.get("DATABASE_URL", "")
+        if _db_url:
+            import psycopg2
+            conn = psycopg2.connect(_db_url)
+            conn.autocommit = True
+            cur = conn.cursor()
+            cur.execute(combined_sql)
+            cur.close()
+            conn.close()
+            return True, "Tables created via direct database connection"
+    except Exception:
+        pass
+
+    # Method 2: Supabase pg_meta HTTP API
+    try:
+        import requests as _req
+        _ref = _url.split("//")[1].split(".supabase.co")[0]
+        _headers = {
+            "apikey": _key,
+            "Authorization": f"Bearer {_key}",
+            "Content-Type": "application/json",
+        }
+        for _endpoint in [
+            f"https://{_ref}.supabase.co/pg/v0/query",
+            f"https://{_ref}.supabase.co/pg/query",
+        ]:
+            try:
+                r = _req.post(_endpoint, json={"query": combined_sql},
+                              headers=_headers, timeout=15)
+                if r.status_code < 400:
+                    return True, "Tables created via Supabase API"
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    return False, (
+        "Auto-setup unavailable. Please run the SQL manually in "
+        "Supabase Dashboard → SQL Editor."
+    )
+
+
 # ── Dashboard stats ────────────────────────────────────────────────
 
 def dashboard_stats() -> dict:

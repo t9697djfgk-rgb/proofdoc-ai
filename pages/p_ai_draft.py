@@ -239,8 +239,7 @@ with tab3:
     import utils.database as _dbcl
     from utils.clause_library import CATEGORIES, JURISDICTIONS
 
-    _CLAUSE_SETUP_SQL = """
-CREATE TABLE IF NOT EXISTS clause_library_db (
+    _CLAUSE_SETUP_SQL = """CREATE TABLE IF NOT EXISTS clause_library_db (
     id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     organization_id UUID,
     title           TEXT NOT NULL,
@@ -255,11 +254,50 @@ CREATE TABLE IF NOT EXISTS clause_library_db (
 );
 CREATE INDEX IF NOT EXISTS idx_clause_lib_org ON clause_library_db(organization_id);
 """
+    _TPL_SETUP_SQL_STUB = """CREATE TABLE IF NOT EXISTS document_templates (
+    id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    organization_id UUID,
+    name            TEXT NOT NULL,
+    category        TEXT DEFAULT '',
+    jurisdiction    TEXT DEFAULT '',
+    body            TEXT DEFAULT '',
+    notes           TEXT DEFAULT '',
+    created_by      UUID,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_doc_tpl_org ON document_templates(organization_id);
+"""
     _cl_db_ok = _dbcl.clauses_db_available()
 
     if not _cl_db_ok:
-        st.info("💡 Run this SQL in Supabase to enable persistent clause storage:")
-        st.code(_CLAUSE_SETUP_SQL, language="sql")
+        st.warning("⚠️ Persistent clause and template storage is not yet set up.")
+        _setup_tabs = st.tabs(["🖥️ Run SQL manually (30 sec)", "⚡ One-click (requires DB password in secrets)"])
+        with _setup_tabs[0]:
+            st.markdown("**Step 1 —** Click to open your Supabase SQL Editor:")
+            st.link_button(
+                "🔗 Open Supabase SQL Editor",
+                "https://supabase.com/dashboard/project/czbfdphckymlknzimyct/sql/new",
+                type="primary",
+            )
+            st.markdown("**Step 2 —** Copy the SQL below, paste it into the editor, and click **Run**.\n"
+                        "This creates both the Clause Library and Template tables in one go.")
+            st.code(_CLAUSE_SETUP_SQL + "\n" + _TPL_SETUP_SQL_STUB, language="sql")
+        with _setup_tabs[1]:
+            st.markdown(
+                "Find your DB connection string at "
+                "**Supabase Dashboard → Settings → Database → Connection string → URI**\n\n"
+                "Add this to `.streamlit/secrets.toml`:\n"
+                "```\nDATABASE_URL = \"<paste the URI here>\"\n```\n"
+                "Then click the button below."
+            )
+            if st.button("🔧 Auto-Create Tables", type="primary", key="cl_setup_btn"):
+                with st.spinner("Creating tables via database connection…"):
+                    _ok, _msg = _dbcl.auto_setup_tables()
+                if _ok:
+                    st.success("✅ Tables created! Reloading…")
+                    st.rerun()
+                else:
+                    st.error(f"Failed: {_msg}")
 
     cl_browse, cl_add, cl_ai = st.tabs(["🔍 Browse & Search", "➕ Add Clause", "🤖 AI Extract"])
 
@@ -573,7 +611,13 @@ CREATE INDEX IF NOT EXISTS idx_doc_tpl_org ON document_templates(organization_id
 """
     _tpl_db_ok = _dbtpl.templates_available()
     if not _tpl_db_ok:
-        st.info("💡 Run this SQL in Supabase to persist templates across sessions:")
+        st.warning("⚠️ Template storage is not yet set up.")
+        st.markdown("Open the SQL Editor and run the combined SQL (also sets up the Clause Library):")
+        st.link_button(
+            "🔗 Open Supabase SQL Editor",
+            "https://supabase.com/dashboard/project/czbfdphckymlknzimyct/sql/new",
+            type="primary",
+        )
         st.code(_TPL_SETUP_SQL, language="sql")
     else:
         st.markdown("Templates are saved permanently to your firm's library.")

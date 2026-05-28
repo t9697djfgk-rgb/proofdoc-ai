@@ -1,14 +1,16 @@
 import streamlit as st
 import datetime
 from utils.shared.sidebar import setup_page
-from utils.shared.styles import slim_header, inject_css, section
+from utils.shared.styles import slim_header, inject_css, section, currency_sym
 from utils.auth import require_lawyer
 import utils.database as db
 
-setup_page()
+api_key = setup_page()
 user = require_lawyer()
 inject_css()
 slim_header("💼", "Billing & Time", "Time tracking, expenses, invoicing, and financial reporting")
+
+_cs = currency_sym()
 
 # Session state for expenses (no DB table — stored per session)
 if "expenses" not in st.session_state:
@@ -70,7 +72,7 @@ with tab_time:
         bt_date   = c2.text_input("Date", value=str(datetime.date.today()), key="bt_d")
         c3, c4, c5 = st.columns(3)
         bt_hours = c3.number_input("Hours", min_value=0.25, step=0.25, value=1.0, key="bt_h")
-        bt_rate  = c4.number_input("Rate (£/hr)", min_value=0.0, step=50.0, value=250.0, key="bt_r")
+        bt_rate  = c4.number_input(f"Rate ({_cs}/hr)", min_value=0.0, step=50.0, value=250.0, key="bt_r")
         bt_desc  = c5.text_input("Description *", placeholder="e.g. Drafting NDA", key="bt_desc")
         if st.form_submit_button("＋ Log Time", type="primary"):
             if not bt_desc.strip():
@@ -94,8 +96,8 @@ with tab_time:
         c1, c2, c3 = st.columns(3)
         for col, label, value, color, bg in [
             (c1, "Total Hours",  f"{total_h:.2f} h",     "#1a2744", "#e8f0fe"),
-            (c2, "Total Value",  f"£{total_val:,.2f}",   "#059669", "#ecfdf5"),
-            (c3, "Unbilled WIP", f"£{unbilled:,.2f}",    "#d97706", "#fffbeb"),
+            (c2, "Total Value",  f"{_cs}total_val:,.2f}",   "#059669", "#ecfdf5"),
+            (c3, "Unbilled WIP", f"{_cs}unbilled:,.2f}",    "#d97706", "#fffbeb"),
         ]:
             col.markdown(
                 f"""<div style="background:{bg};border-radius:10px;padding:0.75rem 1rem;
@@ -120,14 +122,24 @@ with tab_time:
             row[1].text((e.get("description") or "—")[:45])
             row[2].caption(e.get("lawyer") or e.get("profiles", {}).get("full_name","—") or "—")
             row[3].text(f"{e['hours']:.2f}h")
-            row[4].text(f"£{(e.get('rate') or 0):.0f}")
+            row[4].text(f"{_cs}(e.get('rate') or 0):.0f}")
             row[5].markdown(
                 f"<span style='font-weight:600;color:#1a2744'>"
-                f"£{e['hours'] * (e.get('rate') or 0):,.2f}</span>",
+                f"{_cs}e['hours'] * (e.get('rate') or 0):,.2f}</span>",
                 unsafe_allow_html=True,
             )
     else:
-        st.info("No time entries yet.")
+        st.markdown(
+            """<div style="text-align:center;padding:2.5rem 1.5rem;background:#ffffff;
+                           border-radius:14px;border:2px dashed #d1cfc8;margin-top:1rem">
+                 <div style="font-size:2.5rem;margin-bottom:0.75rem">⏱️</div>
+                 <p style="font-size:1rem;font-weight:600;color:#1a2744;margin:0 0 0.35rem">
+                   No time logged yet</p>
+                 <p style="font-size:0.85rem;color:#6b7280;margin:0 0 1.25rem">
+                   Use the form above to log your first time entry, or start the timer in the sidebar.</p>
+               </div>""",
+            unsafe_allow_html=True,
+        )
 
 # ══════════════════════════════════════════════════════════════════
 # TAB 2 – EXPENSES
@@ -141,7 +153,7 @@ with tab_expenses:
     with st.form("expense_form", clear_on_submit=True):
         e1, e2, e3 = st.columns(3)
         ex_desc    = e1.text_input("Description *", placeholder="e.g. Court filing fee")
-        ex_amount  = e2.number_input("Amount (£)", min_value=0.0, step=1.0, value=0.0)
+        ex_amount  = e2.number_input(f"Amount ({_cs})", min_value=0.0, step=1.0, value=0.0)
         ex_date    = e3.text_input("Date", value=str(datetime.date.today()))
         e4, e5, e6 = st.columns(3)
         ex_cat     = e4.selectbox("Category", [
@@ -178,7 +190,7 @@ with tab_expenses:
                             border-left:4px solid #7c3aed">
               <p style="margin:0;font-size:0.72rem;font-weight:600;color:#6b7280;
                         text-transform:uppercase">Total Expenses</p>
-              <p style="margin:0.2rem 0 0;font-size:1.5rem;font-weight:700;color:#7c3aed">£{total_exp:,.2f}</p>
+              <p style="margin:0.2rem 0 0;font-size:1.5rem;font-weight:700;color:#7c3aed">{_cs}total_exp:,.2f}</p>
             </div>""",
             unsafe_allow_html=True,
         )
@@ -187,7 +199,7 @@ with tab_expenses:
                             border-left:4px solid #059669">
               <p style="margin:0;font-size:0.72rem;font-weight:600;color:#6b7280;
                         text-transform:uppercase">Billable to Clients</p>
-              <p style="margin:0.2rem 0 0;font-size:1.5rem;font-weight:700;color:#059669">£{billable_exp:,.2f}</p>
+              <p style="margin:0.2rem 0 0;font-size:1.5rem;font-weight:700;color:#059669">{_cs}billable_exp:,.2f}</p>
             </div>""",
             unsafe_allow_html=True,
         )
@@ -206,7 +218,7 @@ with tab_expenses:
             r[3].caption((ex.get("matter_label","")[:25]) if ex.get("matter_label") != "(No matter)" else "—")
             r[4].markdown(
                 f"<span style='font-weight:600;color:#{'7c3aed' if ex.get('billable') else '6b7280'}'>"
-                f"£{ex['amount']:,.2f}</span>",
+                f"{_cs}ex['amount']:,.2f}</span>",
                 unsafe_allow_html=True,
             )
             if r[5].button("🗑️", key=f"del_exp_{i}"):
@@ -261,7 +273,7 @@ with tab_invoices:
                   <p style="margin:0;font-size:0.72rem;font-weight:600;color:#6b7280;
                             text-transform:uppercase">Total Fees</p>
                   <p style="margin:0.2rem 0 0;font-size:1.5rem;font-weight:700;color:#059669">
-                    £{total_fees:,.2f}</p>
+                    {_cs}total_fees:,.2f}</p>
                 </div>""",
                 unsafe_allow_html=True,
             )
@@ -301,16 +313,16 @@ with tab_invoices:
                     lines.append(
                         f"{str(e.get('entry_date') or e.get('date',''))[:10]:<14}"
                         f"{desc:<28}{e['hours']:>6.2f}  "
-                        f"£{(e.get('rate') or 0):>8.2f}  £{amt:>9,.2f}"
+                        f"{_cs}(e.get('rate') or 0):>8.2f}  {_cs}amt:>9,.2f}"
                     )
                 lines += [
                     "-" * 55,
-                    f"{'Subtotal':<49} £{total_fees:>9,.2f}",
+                    f"{'Subtotal':<49} {_cs}total_fees:>9,.2f}",
                 ]
                 if inv_vat > 0:
-                    lines.append(f"{'VAT ('+str(int(inv_vat))+'%)':<49} £{vat_amt:>9,.2f}")
+                    lines.append(f"{'VAT ('+str(int(inv_vat))+'%)':<49} {_cs}vat_amt:>9,.2f}")
                 lines += [
-                    f"{'TOTAL DUE':<49} £{total_incl:>9,.2f}",
+                    f"{'TOTAL DUE':<49} {_cs}total_incl:>9,.2f}",
                     "",
                     inv_terms,
                 ]
@@ -378,7 +390,7 @@ with tab_invoices:
                 db.notify_matter_members(
                     selected_mid, "invoice_ready",
                     f"Invoice {_inv_data.get('ref','')} issued",
-                    body=f"Total: £{_inv_data.get('total', 0):,.2f}",
+                    body=f"Total: {_cs}_inv_data.get('total', 0):,.2f}",
                 )
                 st.success(f"✅ {n} entries marked as billed. Invoice saved.")
                 st.session_state.pop("inv_preview", None)
@@ -445,7 +457,7 @@ with tab_invoices:
             )
             _inv_cols[1].caption(str(inv.get("issued_date",""))[:10])
             _inv_cols[2].markdown(
-                f"**£{inv.get('total_amount',0):,.2f}**"
+                f"**{_cs}inv.get('total_amount',0):,.2f}**"
             )
             _inv_cols[3].markdown(
                 f'<span style="background:{_bg};color:{_fg};font-size:.72rem;font-weight:600;'
@@ -503,9 +515,9 @@ with tab_reports:
     c1, c2, c3, c4 = st.columns(4)
     for col, label, value, color, bg in [
         (c1, "Total Hours",   f"{total_h:.2f} h",  "#1a2744", "#e8f0fe"),
-        (c2, "Total Value",   f"£{total_val:,.2f}", "#059669", "#ecfdf5"),
-        (c3, "Billed",        f"£{billed:,.2f}",    "#2563eb", "#eff6ff"),
-        (c4, "WIP Unbilled",  f"£{unbilled:,.2f}",  "#d97706", "#fffbeb"),
+        (c2, "Total Value",   f"{_cs}total_val:,.2f}", "#059669", "#ecfdf5"),
+        (c3, "Billed",        f"{_cs}billed:,.2f}",    "#2563eb", "#eff6ff"),
+        (c4, "WIP Unbilled",  f"{_cs}unbilled:,.2f}",  "#d97706", "#fffbeb"),
     ]:
         col.markdown(
             f"""<div style="background:{bg};border-radius:10px;padding:0.75rem 1rem;
@@ -536,7 +548,7 @@ with tab_reports:
                                margin-bottom:0.35rem;border:1px solid rgba(0,0,0,0.07)">
                   <div style="display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:0.85rem;font-weight:600;color:#1a2744">{name}</span>
-                    <span style="font-size:0.85rem;font-weight:700;color:#059669">£{data['value']:,.2f}</span>
+                    <span style="font-size:0.85rem;font-weight:700;color:#059669">{_cs}data['value']:,.2f}</span>
                   </div>
                   <div style="display:flex;justify-content:space-between;margin-top:0.2rem">
                     <span style="font-size:0.73rem;color:#6b7280">{data['hours']:.2f}h</span>
@@ -567,7 +579,7 @@ with tab_reports:
                                margin-bottom:0.35rem;border:1px solid rgba(0,0,0,0.07)">
                   <div style="display:flex;justify-content:space-between;align-items:center">
                     <span style="font-size:0.82rem;font-weight:600;color:#1a2744">{label}</span>
-                    <span style="font-size:0.85rem;font-weight:700;color:#059669">£{data['value']:,.2f}</span>
+                    <span style="font-size:0.85rem;font-weight:700;color:#059669">{_cs}data['value']:,.2f}</span>
                   </div>
                   <div style="display:flex;justify-content:space-between;margin-top:0.2rem">
                     <span style="font-size:0.73rem;color:#6b7280">{data['hours']:.2f}h</span>
@@ -585,13 +597,13 @@ with tab_reports:
         "BILLING REPORT", "=" * 40,
         f"Generated: {datetime.date.today()}",
         f"Total Hours: {total_h:.2f}h",
-        f"Total Value: £{total_val:,.2f}",
-        f"Billed: £{billed:,.2f}",
-        f"WIP (Unbilled): £{unbilled:,.2f}",
+        f"Total Value: {_cs}total_val:,.2f}",
+        f"Billed: {_cs}billed:,.2f}",
+        f"WIP (Unbilled): {_cs}unbilled:,.2f}",
         "", "BY LAWYER:",
     ]
     for name, data in lawyers.items():
-        report_lines.append(f"  {name}: {data['hours']:.2f}h  £{data['value']:,.2f}")
+        report_lines.append(f"  {name}: {data['hours']:.2f}h  {_cs}data['value']:,.2f}")
     st.download_button(
         "⬇️ Export Report (.txt)", "\n".join(report_lines),
         f"billing_report_{datetime.date.today()}.txt", "text/plain", key="br_exp",

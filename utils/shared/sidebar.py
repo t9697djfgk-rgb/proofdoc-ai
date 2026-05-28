@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.shared.styles import inject_css
+from utils.shared.styles import inject_css, currency_sym
 
 
 def render_sidebar(tool_name: str = "") -> str | None:
@@ -126,7 +126,7 @@ def render_sidebar(tool_name: str = "") -> str | None:
                 _tdesc = st.text_input("What are you working on?", key="sb_timer_desc",
                                        label_visibility="collapsed",
                                        placeholder="e.g. Drafting NDA, client call…")
-                _trate = st.number_input("Rate (£/hr)", min_value=0.0, step=50.0,
+                _trate = st.number_input(f"Rate ({currency_sym()}/hr)", min_value=0.0, step=50.0,
                                          value=250.0, key="sb_timer_rate",
                                          label_visibility="collapsed")
                 _sc1, _sc2 = st.columns(2)
